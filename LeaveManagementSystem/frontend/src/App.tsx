@@ -314,7 +314,7 @@ export default function App() {
             {tab === 'dashboard' && <Dashboard currentUser={currentUser!} employees={employees} leaves={leaves} company={company!} leaveTypes={leaveTypes} isAdmin={isAdmin} />}
             {tab === 'apply' && <ApplyLeave currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} onApply={loadAppData} />}
             {tab === 'history' && <LeaveHistory currentUser={currentUser!} leaves={leaves} employees={employees} leaveTypes={leaveTypes} isAdmin={isAdmin} onApprove={loadAppData} />}
-            {tab === 'employees' && isAdmin && <EmployeeMgmt employees={employees} currentUser={currentUser!} leaves={leaves} company={company!} onUpdate={loadAppData} />}
+            {tab === 'employees' && isAdmin && <EmployeeMgmt employees={employees} currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} onUpdate={loadAppData} />}
             {tab === 'settings' && isAdmin && <CompanySettings company={company!} employees={employees} currentUser={currentUser!} onSave={loadAppData} />}
           </>
         )}
@@ -996,6 +996,7 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
 
   const pendingCount = myLeaves.filter(l => l.status === 'pending').length;
   const [bulkApproving, setBulkApproving] = useState(false);
+  const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
 
   const handleBulkApprove = async () => {
     const pendingsOnPage = paginatedData.filter(l => l.status === 'pending');
@@ -1209,18 +1210,21 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
                     </td>
                     {isAdmin && (
                       <td style={{ textAlign: 'right' }}>
-                        {l.status === 'pending' ? (
-                          <div style={{ display: 'inline-flex', gap: 6 }}>
-                            <button className="btn btn-primary" onClick={() => handleAction(l.id, 'approved')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
-                              <Check size={12} /> 승인
-                            </button>
-                            <button className="btn btn-danger" onClick={() => handleAction(l.id, 'rejected')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
-                              <X size={12} /> 반려
-                            </button>
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>처리 완료</span>
-                        )}
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          {l.status === 'pending' && (
+                            <>
+                              <button className="btn btn-primary" onClick={() => handleAction(l.id, 'approved')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
+                                <Check size={12} /> 승인
+                              </button>
+                              <button className="btn btn-danger" onClick={() => handleAction(l.id, 'rejected')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
+                                <X size={12} /> 반려
+                              </button>
+                            </>
+                          )}
+                          <button className="btn" onClick={() => setEditingLeave(l)} style={{ padding: '4px 8px', fontSize: 11 }}>
+                            수정
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -1230,6 +1234,15 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
           </tbody>
         </table>
       </div>
+
+      {editingLeave && (
+        <EditLeaveModal
+          leave={editingLeave}
+          leaveTypes={leaveTypes}
+          onClose={() => setEditingLeave(null)}
+          onSave={onApprove}
+        />
+      )}
 
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: '0.5rem' }}>
@@ -1276,12 +1289,110 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
   );
 }
 
+
+
+// ---------- Edit Leave Modal ----------
+function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
+  leave: Leave;
+  leaveTypes: any[];
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const [type, setType] = useState(leave.type);
+  const [unit, setUnit] = useState(leave.unit);
+  const [status, setStatus] = useState<'pending' | 'approved' | 'rejected'>(leave.status);
+  const [reason, setReason] = useState(leave.reason || '');
+  const [startDate, setStartDate] = useState(leave.start_date);
+  const [endDate, setEndDate] = useState(leave.end_date);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await leaveAPI.updateLeaveDetails(leave.id, {
+        type,
+        unit: Number(unit),
+        status,
+        reason,
+        start_date: startDate,
+        end_date: endDate,
+      });
+      alert('휴가 내역이 정상적으로 수정되었습니다.');
+      onSave();
+      onClose();
+    } catch (err: any) {
+      alert(err.response?.data?.message || '수정에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div className="glass-card animate-scale" style={{ background: '#fff', maxWidth: 480, width: '100%', padding: '1.75rem', borderRadius: 12, border: '1px solid var(--gray-200)', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 10 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>휴가 내역 세부 수정</h3>
+          <button className="btn btn-ghost" onClick={onClose} style={{ padding: 4 }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">휴가 종류 (구분)</label>
+            <select value={type} onChange={e => setType(e.target.value)} className="input-field">
+              {leaveTypes.map(t => (
+                <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '연차차감제외' : '연차차감'})</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">사용 일수 (unit)</label>
+              <input type="number" step="0.25" value={unit} onChange={e => setUnit(parseFloat(e.target.value) || 0)} className="input-field" />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">결재 상태 (status)</label>
+              <select value={status} onChange={e => setStatus(e.target.value as any)} className="input-field">
+                <option value="approved">승인됨 (approved)</option>
+                <option value="pending">대기 중 (pending)</option>
+                <option value="rejected">반려됨 (rejected)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">시작일</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="input-field" />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">종료일</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="input-field" />
+            </div>
+          </div>
+
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">신청 사유</label>
+            <input type="text" value={reason} onChange={e => setReason(e.target.value)} className="input-field" placeholder="사유 입력..." />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
+            <button className="btn btn-ghost" onClick={onClose}>취소</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? '저장 중...' : '수정 사항 저장'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Employee Management ----------
-function EmployeeMgmt({ employees, currentUser, leaves, company, onUpdate }: {
+function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onUpdate }: {
   employees: Employee[];
   currentUser: Employee;
   leaves: Leave[];
   company: Company;
+  leaveTypes: any[];
   onUpdate: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -1430,7 +1541,9 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, onUpdate }: {
           emp={selectedHistoryEmp} 
           leaves={leaves} 
           company={company} 
+          leaveTypes={leaveTypes}
           onClose={() => setSelectedHistoryEmp(null)} 
+          onRefresh={onUpdate}
         />
       )}
 
@@ -1477,7 +1590,7 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, onUpdate }: {
                     )}
                   </td>
                   <td style={{ fontWeight: 600 }}>
-                    {remaining.toFixed(2)}일 잔여
+                    <span style={{ color: remaining < 0 ? 'var(--danger)' : 'var(--gray-900)' }}>{remaining.toFixed(2)}일 잔여</span>
                     <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--gray-500)', marginLeft: 4 }}>(사용 {balance.used.toFixed(2)}일 / 총 {total}일)</span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
@@ -1505,14 +1618,68 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, onUpdate }: {
 }
 
 // ---------- History Modal ----------
-function HistoryModal({ emp, leaves, company, onClose }: {
+function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: {
   emp: Employee;
   leaves: Leave[];
   company: Company;
+  leaveTypes: any[];
   onClose: () => void;
+  onRefresh: () => void;
 }) {
   const balance = getCurrentLeaveBalance(emp.join_date, leaves.filter(l => l.emp_id === emp.id), company?.basis_type, company?.basis_date, new Date(), company?.leave_disposal ?? 'expire');
   
+  const empLeaves = useMemo(() => {
+    return leaves.filter(l => l.emp_id === emp.id).sort((a, b) => b.start_date.localeCompare(a.start_date));
+  }, [leaves, emp.id]);
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [batchType, setBatchType] = useState<string>('unpaid_annual');
+  const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === empLeaves.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(empLeaves.map(l => l.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleBatchTypeChange = async () => {
+    if (selectedIds.length === 0) return alert('일괄 변경할 휴가 항목을 1개 이상 선택해 주세요.');
+    const targetTypeObj = leaveTypes.find(t => t.id === batchType);
+    const targetLabel = targetTypeObj ? targetTypeObj.label : batchType;
+
+    if (!confirm(`선택한 ${selectedIds.length}건의 휴가 구분을 '${targetLabel}'(으)로 일괄 변경하시겠습니까?\n변경 시 연차 차감 일수가 재산출됩니다.`)) return;
+
+    setIsUpdating(true);
+    try {
+      await leaveAPI.batchUpdateLeaveType(selectedIds, batchType);
+      alert(`${selectedIds.length}건의 휴가 종류가 '${targetLabel}'(으)로 성공적으로 일괄 변경되었습니다.`);
+      setSelectedIds([]);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.response?.data?.message || '일괄 변경 처리에 실패했습니다.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteLeave = async (leaveId: string) => {
+    if (!confirm('해당 휴가 내역을 정말로 삭제하시겠습니까? 삭제 후에는 연차 사용 일수가 즉시 재산출됩니다.')) return;
+    try {
+      await leaveAPI.deleteLeave(leaveId);
+      alert('휴가 내역이 삭제되었습니다.');
+      onRefresh();
+    } catch (err: any) {
+      alert(err.response?.data?.message || '삭제 처리에 실패했습니다.');
+    }
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -1529,7 +1696,7 @@ function HistoryModal({ emp, leaves, company, onClose }: {
     }}>
       <div className="glass-card animate-scale" style={{
         background: '#fff',
-        maxWidth: 650,
+        maxWidth: 750,
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
@@ -1541,10 +1708,10 @@ function HistoryModal({ emp, leaves, company, onClose }: {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--gray-200)', paddingBottom: '1rem' }}>
           <div>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-900)' }}>
-              {emp.name}님의 전체 연차 생성 이력
+              {emp.name}님의 전체 연차 이력 및 등록 휴가 관리
             </h3>
             <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-              입사일: {formatDateStr(emp.join_date)} · 부서: {emp.department || '미지정'}
+              입사일: {formatDateStr(emp.join_date)} · 부서: {emp.department || '미지정'} · 이메일: {emp.email}
             </p>
           </div>
           <button 
@@ -1556,21 +1723,21 @@ function HistoryModal({ emp, leaves, company, onClose }: {
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ background: 'var(--primary-light)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-border)50' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: 4 }}>현재 주기 상태 요약</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>
                 주기: {balance.activeCycle?.startDate} ~ {balance.activeCycle?.endDate}
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--primary)' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: balance.remaining < 0 ? 'var(--danger)' : 'var(--primary)' }}>
                 잔여 {balance.remaining.toFixed(2)}일 (부여: {balance.granted}일 / 사용: {balance.used.toFixed(2)}일)
               </span>
             </div>
           </div>
 
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)', marginBottom: 10 }}>전체 생성 주기 이력</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)', marginBottom: 10 }}>회차별 연차 생성 이력</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {balance.allCycles.map((c, ci) => {
                 const isActive = balance.activeCycle?.startDate === c.startDate && balance.activeCycle?.endDate === c.endDate;
@@ -1606,7 +1773,7 @@ function HistoryModal({ emp, leaves, company, onClose }: {
                       </div>
                       <div>
                         <div style={{ color: 'var(--gray-500)', fontSize: 10, fontWeight: 600 }}>잔여일수</div>
-                        <div style={{ fontWeight: 700, color: 'var(--primary)', marginTop: 2 }}>{c.remainingDays.toFixed(2)}일</div>
+                        <div style={{ fontWeight: 700, color: c.remainingDays < 0 ? 'var(--danger)' : 'var(--primary)', marginTop: 2 }}>{c.remainingDays.toFixed(2)}일</div>
                       </div>
                     </div>
                   </div>
@@ -1614,7 +1781,144 @@ function HistoryModal({ emp, leaves, company, onClose }: {
               })}
             </div>
           </div>
+
+          <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div>
+                <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--gray-900)' }}>등록된 휴가 내역 및 일괄 종류 변경</h4>
+                <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
+                  예비군, 무급연차, 임산부단축근무 등이 연차로 잘못 일괄 등록된 경우 항목을 선택하여 타 휴가 종류로 일괄 전환할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            {empLeaves.length > 0 && (
+              <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={empLeaves.length > 0 && selectedIds.length === empLeaves.length} 
+                      onChange={toggleSelectAll} 
+                      style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 14, height: 14 }} 
+                    />
+                    전체 선택 ({selectedIds.length}/{empLeaves.length})
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: 'var(--gray-600)', fontWeight: 500 }}>변경할 휴가 종류:</span>
+                  <select 
+                    value={batchType} 
+                    onChange={e => setBatchType(e.target.value)} 
+                    className="input-field" 
+                    style={{ padding: '4px 8px', fontSize: 12, width: 'auto', margin: 0 }}
+                  >
+                    {leaveTypes.map(t => (
+                      <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '차감제외' : '연차차감'})</option>
+                    ))}
+                  </select>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleBatchTypeChange} 
+                    disabled={selectedIds.length === 0 || isUpdating} 
+                    style={{ padding: '5px 12px', fontSize: 11 }}
+                  >
+                    {isUpdating ? '변경 중...' : '선택 건 휴가종류 일괄 변경'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {empLeaves.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--gray-400)', fontSize: 12, background: '#fafafa', borderRadius: 8 }}>
+                등록된 휴가 내역이 없습니다.
+              </div>
+            ) : (
+              <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8 }}>
+                <table className="custom-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9' }}>
+                      <th style={{ width: 36, textAlign: 'center' }}>선택</th>
+                      <th>기간</th>
+                      <th>휴가 구분</th>
+                      <th>일수</th>
+                      <th>상태</th>
+                      <th>사유</th>
+                      <th style={{ textAlign: 'right' }}>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {empLeaves.map(l => {
+                      const isChecked = selectedIds.includes(l.id);
+                      const typeObj = leaveTypes.find(t => t.id === l.type);
+                      const typeLabel = typeObj ? typeObj.label : l.type;
+                      const isExempt = typeObj ? typeObj.exempt : false;
+                      
+                      return (
+                        <tr key={l.id} style={{ background: isChecked ? 'var(--primary-light)20' : 'transparent' }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked} 
+                              onChange={() => toggleSelectOne(l.id)} 
+                              style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 14, height: 14 }} 
+                            />
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            {formatDateStr(l.start_date)} {l.start_date !== l.end_date ? `~ ${formatDateStr(l.end_date)}` : ''}
+                          </td>
+                          <td>
+                            <span style={{ 
+                              fontSize: 11, 
+                              padding: '2px 6px', 
+                              borderRadius: 4, 
+                              fontWeight: 600, 
+                              background: isExempt ? '#F3F4F6' : '#EEF2FF', 
+                              color: isExempt ? '#4B5563' : '#4F46E5', 
+                              border: `1px solid ${isExempt ? '#E5E7EB' : '#C7D2FE'}` 
+                            }}>
+                              {typeLabel} {isExempt ? '(차감제외)' : ''}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{fmtUnit(l.unit)}</td>
+                          <td>
+                            <StatusBadge 
+                              label={l.status === 'approved' ? '승인됨' : l.status === 'pending' ? '대기중' : '반려됨'} 
+                              color={l.status === 'approved' ? 'var(--success)' : l.status === 'pending' ? 'var(--warning)' : 'var(--danger)'} 
+                              bg={l.status === 'approved' ? 'var(--success-light)' : l.status === 'pending' ? 'var(--warning-light)' : 'var(--danger-light)'} 
+                            />
+                          </td>
+                          <td style={{ color: 'var(--gray-600)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.reason || '-'}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: 4 }}>
+                              <button className="btn" onClick={() => setEditingLeave(l)} style={{ padding: '3px 8px', fontSize: 10 }}>수정</button>
+                              <button className="btn btn-danger" onClick={() => handleDeleteLeave(l.id)} style={{ padding: '3px 8px', fontSize: 10 }}>삭제</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
+
+        {editingLeave && (
+          <EditLeaveModal
+            leave={editingLeave}
+            leaveTypes={leaveTypes}
+            onClose={() => setEditingLeave(null)}
+            onSave={() => {
+              setEditingLeave(null);
+              onRefresh();
+            }}
+          />
+        )}
 
         <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn btn-primary" onClick={onClose} style={{ padding: '8px 20px' }}>
@@ -2236,7 +2540,7 @@ function LoginScreen({ companies, onLogin, onRegister }: {
                     onChange={e => setRememberEmail(e.target.checked)} 
                     style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 15, height: 15 }} 
                   />
-                  이메일 주소 저장
+                  ID(이메일 주소) 저장
                 </label>
               </div>
               <button className="btn btn-primary" onClick={handleLoginSubmit} style={{ height: 44, fontSize: 14 }}>

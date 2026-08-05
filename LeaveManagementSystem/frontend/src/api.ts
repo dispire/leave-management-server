@@ -318,6 +318,47 @@ export const leaveAPI = {
     }
     throw { response: { data: { message: res.message || '결재 실패' } } };
   },
+  updateLeaveDetails: async (leaveId: string, data: Partial<Leave>) => {
+    const user = getSessionUser();
+    if (!user) throw new Error('Unauthorized');
+    const res = await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveDetails', {
+      leaveId,
+      companyId: user.company_id,
+      data
+    });
+    if (res.success) {
+      cache.invalidate(cacheKey('getLeaves', user.company_id));
+      return { success: true, message: res.message || '수정 성공' };
+    }
+    throw { response: { data: { message: res.message || '수정 실패' } } };
+  },
+  batchUpdateLeaveType: async (leaveIds: string[], newType: string) => {
+    const user = getSessionUser();
+    if (!user) throw new Error('Unauthorized');
+    const res = await makeGASRequest<{ success: boolean; message?: string }>('batchUpdateLeaveType', {
+      leaveIds,
+      newType,
+      companyId: user.company_id
+    });
+    if (res.success) {
+      cache.invalidate(cacheKey('getLeaves', user.company_id));
+      return { success: true, message: res.message || '일괄 변경 성공' };
+    }
+    throw { response: { data: { message: res.message || '일괄 변경 실패' } } };
+  },
+  deleteLeave: async (leaveId: string) => {
+    const user = getSessionUser();
+    if (!user) throw new Error('Unauthorized');
+    const res = await makeGASRequest<{ success: boolean; message?: string }>('deleteLeave', {
+      leaveId,
+      companyId: user.company_id
+    });
+    if (res.success) {
+      cache.invalidate(cacheKey('getLeaves', user.company_id));
+      return { success: true, message: res.message || '삭제 성공' };
+    }
+    throw { response: { data: { message: res.message || '삭제 실패' } } };
+  },
 };
 
 const api = axios.create({
