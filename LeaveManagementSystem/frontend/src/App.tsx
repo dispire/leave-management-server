@@ -2095,9 +2095,25 @@ function LoginScreen({ companies, onLogin, onRegister }: {
   onRegister: (data: any) => void;
 }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
+  const [rememberEmail, setRememberEmail] = useState(() => {
+    return localStorage.getItem('remember_email') === 'true';
+  });
+  const [email, setEmail] = useState(() => {
+    return localStorage.getItem('saved_email') || '';
+  });
   const [loginPassword, setLoginPassword] = useState('');
-  
+
+  const handleLoginSubmit = () => {
+    if (rememberEmail) {
+      localStorage.setItem('saved_email', email);
+      localStorage.setItem('remember_email', 'true');
+    } else {
+      localStorage.removeItem('saved_email');
+      localStorage.removeItem('remember_email');
+    }
+    onLogin(email, loginPassword);
+  };
+
   // Registration form
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -2198,7 +2214,7 @@ function LoginScreen({ companies, onLogin, onRegister }: {
                   onChange={e => setEmail(e.target.value)} 
                   placeholder="name@company.com" 
                   className="input-field" 
-                  onKeyDown={e => e.key === 'Enter' && onLogin(email, loginPassword)}
+                  onKeyDown={e => e.key === 'Enter' && handleLoginSubmit()}
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
@@ -2209,17 +2225,23 @@ function LoginScreen({ companies, onLogin, onRegister }: {
                   onChange={e => setLoginPassword(e.target.value)} 
                   placeholder="••••••••" 
                   className="input-field" 
-                  onKeyDown={e => e.key === 'Enter' && onLogin(email, loginPassword)}
+                  onKeyDown={e => e.key === 'Enter' && handleLoginSubmit()}
                 />
               </div>
-              <button className="btn btn-primary" onClick={() => onLogin(email, loginPassword)} style={{ height: 44, fontSize: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0 4px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--gray-700)', cursor: 'pointer', userSelect: 'none' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={rememberEmail} 
+                    onChange={e => setRememberEmail(e.target.checked)} 
+                    style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 15, height: 15 }} 
+                  />
+                  이메일 주소 저장
+                </label>
+              </div>
+              <button className="btn btn-primary" onClick={handleLoginSubmit} style={{ height: 44, fontSize: 14 }}>
                 로그인 <ArrowRight size={16} />
               </button>
-              <div style={{ fontSize: 11, color: 'var(--gray-500)', textAlign: 'center', background: 'var(--gray-50)', padding: '10px', borderRadius: 8, border: '1px solid var(--gray-200)', marginTop: 8 }}>
-                <strong>데모 테스트 계정</strong><br />
-                인사관리자: <code>admin@tech.com</code> (비밀번호: <code>1234</code>)<br />
-                일반 임직원: <code>minjun@tech.com</code> (비밀번호: <code>1234</code>)
-              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
