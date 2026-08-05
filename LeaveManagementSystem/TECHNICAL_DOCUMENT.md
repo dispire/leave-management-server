@@ -80,6 +80,7 @@ graph TD
 | **24** | 일반 임직원 본인 휴가 신청 직접 취소(`[신청 취소]`) 기능 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1060-L1265) | `LeaveHistory` 탭에서 일반 임직원도 본인의 신청 대기(`pending`) 및 승인(`approved`) 휴가 건에 대해 관리자 개입 없이 직접 **`[신청 취소]`** 가능 조치 → 클릭 시 즉시 취소/삭제 및 연차 일수 자동 복원 |
 | **25** | 날짜 범위 변경 시 사용단위 UI 레이아웃 고정 및 로딩 속도 최적화 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L148-L185), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L875-L905) | ① `ApplyLeave` 탭 사용 단위 필드가 날짜 변경 시 사러지던 오동작 수정 ➔ 기간 지정 시 `8일 (자동 산출)` 읽기 전용 모드로 UI 고정 보정. ② `loadAppData` 갱신 시 화면 차단 스피너(`dataLoading`) 제거 및 캐시 우선 렌더 ➔ 0.01초 즉시 반응 및 백그라운드 동기화로 속도 10배 최적화 |
 | **26** | 반차 사용단위 0.5일 고정 및 대시보드 승인 이력/캘린더 렌더링 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L470-L720), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L880-L900) | ① `ApplyLeave` 탭에서 오전반차/오후반차 선택 시 `0.5일 (반차 고정)` 필드로 비활성 고정. ② Dashboard 내 `leavesByDay` 타임존 날짜 누락 보정 및 `최근 승인된 연차/반차 이력` 위젯 신설 |
+| **27** | 대시보드 회사휴가/경조휴가 및 관리자/직원 전체 승인 휴가 표시 누락 수정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L426-L760) | ① `myCompanyEmps` 내 `role !== 'admin'` 필터 제거 ➔ 이광희 등 관리자 계정 승인 휴가 대시보드 누락 수정. ② 일반 직원 계정 캘린더 `allLeaves` 범위 확대 ➔ 회사휴가/경조휴가/동료 승인 휴가 캘린더 정상 표출. ③ 캘린더 범주 라벨 및 색상(Emerald/Amber/Indigo) 매칭 보정 |
 
 ---
 
@@ -138,6 +139,15 @@ graph TD
   * `carryOverDays`: 이전 주기에서 이월된 잔여 일수
   * `allowanceDays`: 수당 지급 처리된 일수
   * `debtDays`: 이전 주기 초과 사용 부채 (다음 주기 선차감)
+
+### 4.7. 대시보드 승인 휴가 표기 누락 수정 및 회사/경조휴가 캘린더 연동 (Dashboard Leave Visibility Fix)
+* **원인 분석**:
+  1. 기존 `myCompanyEmps` 필터링에서 `e.role !== 'admin'` 조건이 포함되어 있어, 관리자(예: 이광희)가 신청 및 승인받은 회사휴가/연차가 `allLeaves`에서 배제되어 대시보드 캘린더와 최근 승인 내역 위젯에서 표시가 누락되는 문제 발생.
+  2. 일반 사용자 계정 접속 시 `allLeaves`가 본인 신청 내역(`l.emp_id === currentUser.id`)으로만 제한되어 있어 다른 사원의 회사휴가 및 경조휴가가 캘린더에 표시되지 않던 현상 개선.
+* **개선 조치**:
+  1. `companyEmployees`: 현재 로그인 사용자와 동일한 `company_id`를 가진 전체 임직원(관리자 + 일반 사원)으로 범위를 정상화.
+  2. `allLeaves`: 관리자 및 일반 사원 모두 소속 회사의 전체 승인 휴가를 대시보드 캘린더 및 최근 승인 이력 위젯에 표출하도록 연동.
+  3. **캘린더 라벨 및 색상 매칭 보정**: `leaveTypes` 매칭 실패 시 원본 `l.type`을 Fallback 라벨로 사용하고, 경조휴가(Amber), 회사휴가(Emerald), 연차/반차(Indigo) 범주별 색상이 캘린더 및 위젯 배지에 정확히 반영되도록 정밀화.
 
 ---
 
