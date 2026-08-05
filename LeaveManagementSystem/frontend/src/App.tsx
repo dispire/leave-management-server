@@ -1831,7 +1831,11 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 8, fontSize: 12 }}>
                       <div>
                         <div style={{ color: 'var(--gray-500)', fontSize: 10, fontWeight: 600 }}>총 부여일수</div>
-                        <div style={{ fontWeight: 600, color: 'var(--gray-800)', marginTop: 2 }}>{c.grantedDays}일</div>
+                        <div style={{ fontWeight: 600, color: 'var(--gray-800)', marginTop: 2 }}>
+                          {c.grantedDays}일
+                          {c.debtDays ? <div style={{ fontSize: 9, color: 'var(--danger)', marginTop: 1 }}>(전주기부채 -{c.debtDays}일)</div> : null}
+                          {c.carryOverDays ? <div style={{ fontSize: 9, color: 'var(--primary)', marginTop: 1 }}>(전주기이월 +{c.carryOverDays}일)</div> : null}
+                        </div>
                       </div>
                       <div>
                         <div style={{ color: 'var(--gray-500)', fontSize: 10, fontWeight: 600 }}>사용일수</div>

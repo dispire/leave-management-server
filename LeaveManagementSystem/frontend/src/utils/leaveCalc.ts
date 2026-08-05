@@ -276,23 +276,22 @@ export function calculateLeaveCycles(
     const c = cycles[i];
     const cycleEnded = todayStr > c.endDate; // 이 주기가 이미 끝났는지
 
-    // 1. 이전 주기에서 이월된 보너스를 이 주기 부여 일수에 추가 (이월 모드)
+    // 1. 이전 주기에서 이월된 보너스 (이월 모드)
     if (carryOverBonus > 0) {
       c.carryOverDays = carryOverBonus;
-      c.grantedDays = c.grantedDays + carryOverBonus;
       carryOverBonus = 0;
     }
 
-    // 2. 이전 주기의 초과 사용 부채를 이 주기 부여 일수에서 선차감 (모든 모드 공통)
+    // 2. 이전 주기의 초과 사용 부채 (모든 모드 공통)
     if (carryOverDebt > 0) {
       c.debtDays = carryOverDebt;
-      const reduction = Math.min(carryOverDebt, c.grantedDays);
-      c.grantedDays = c.grantedDays - reduction;
+      const totalAvailable = c.grantedDays + (c.carryOverDays || 0);
+      const reduction = Math.min(carryOverDebt, totalAvailable);
       carryOverDebt = Math.max(0, carryOverDebt - reduction);
     }
 
-    // 3. 이 주기의 실제 잔여 계산 (음수 가능: 초과 사용)
-    c.remainingDays = c.grantedDays - c.usedDays;
+    // 3. 이 주기의 실제 잔여 계산 (총 부여일수 c.grantedDays는 원본 수량 유지)
+    c.remainingDays = c.grantedDays + (c.carryOverDays || 0) - (c.debtDays || 0) - c.usedDays;
 
     // 4. 주기가 종료된 경우에만 처분 방식 적용
     if (cycleEnded) {
