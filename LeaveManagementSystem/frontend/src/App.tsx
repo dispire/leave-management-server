@@ -1059,6 +1059,17 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
     }
   };
 
+  const handleCancelMyLeave = async (id: string) => {
+    if (!confirm('신청하신 휴가를 정말 취소하시겠습니까?\n취소 시 연차 사용 일수가 즉시 환급/복원됩니다.')) return;
+    try {
+      await leaveAPI.deleteLeave(id);
+      alert('휴가 신청이 취소 처리되었습니다.');
+      onApprove();
+    } catch (err: any) {
+      alert(err.response?.data?.message || '취소 처리에 실패했습니다.');
+    }
+  };
+
   const pageNumbers = useMemo(() => {
     const pages = new Set<number>();
     for (let i = 1; i <= Math.min(10, totalPages); i++) {
@@ -1081,7 +1092,7 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
             {isAdmin ? '신청/결재 관리' : '휴가 신청 내역'}
           </h2>
           <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-            {isAdmin ? '소속 임직원들의 휴가 신청을 검토하고 승인하거나 반려합니다.' : '신청하신 휴가의 결재 상태 및 사용 내역을 조회합니다.'}
+            {isAdmin ? '소속 임직원들의 휴가 신청을 검토하고 승인하거나 반려합니다.' : '신청하신 휴가의 결재 상태를 조회하며, 직접 신청을 취소할 수 있습니다.'}
           </p>
         </div>
         {isAdmin && pendingCount > 0 && (
@@ -1197,7 +1208,7 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
               <th>사용일</th>
               <th>사유</th>
               <th>결재상태</th>
-              {isAdmin && <th style={{ textAlign: 'right' }}>작업</th>}
+              <th style={{ textAlign: 'right' }}>관리 / 작업</th>
             </tr>
           </thead>
           <tbody>
@@ -1235,25 +1246,35 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
                     <td>
                       <StatusBadge label={stat.label} color={stat.color} bg={stat.bg} />
                     </td>
-                    {isAdmin && (
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
-                          {l.status === 'pending' && (
-                            <>
-                              <button className="btn btn-primary" onClick={() => handleAction(l.id, 'approved')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
-                                <Check size={12} /> 승인
-                              </button>
-                              <button className="btn btn-danger" onClick={() => handleAction(l.id, 'rejected')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
-                                <X size={12} /> 반려
-                              </button>
-                            </>
-                          )}
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        {isAdmin && l.status === 'pending' && (
+                          <>
+                            <button className="btn btn-primary" onClick={() => handleAction(l.id, 'approved')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
+                              <Check size={12} /> 승인
+                            </button>
+                            <button className="btn btn-danger" onClick={() => handleAction(l.id, 'rejected')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
+                              <X size={12} /> 반려
+                            </button>
+                          </>
+                        )}
+                        {isAdmin && (
                           <button className="btn" onClick={() => setEditingLeave(l)} style={{ padding: '4px 8px', fontSize: 11 }}>
                             수정
                           </button>
-                        </div>
-                      </td>
-                    )}
+                        )}
+                        {!isAdmin && (
+                          <button 
+                            className="btn btn-danger" 
+                            onClick={() => handleCancelMyLeave(l.id)} 
+                            style={{ padding: '4px 8px', fontSize: 11 }}
+                            disabled={l.status === 'rejected'}
+                          >
+                            {l.status === 'approved' ? '취소 요청 (삭제)' : '신청 취소'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })
