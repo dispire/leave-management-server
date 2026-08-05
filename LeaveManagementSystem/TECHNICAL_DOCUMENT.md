@@ -56,6 +56,7 @@ graph TD
 | **17** | 연차 계산 로직 검증 및 예외 케이스 정밀 보정 | **완료** | [leaveCalc.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/utils/leaveCalc.ts) | ① `parseLocalDate` Date 객체 인스턴스 직접 수용으로 파싱 오동작 차단. ② 입사 예정 사원의 0일 부여(첫 주기) Fallback 보정. ③ 월말 입사자 만근 월수 연산 보완. ④ 입사일 기준 1년차 이후 주기 라벨(`2년차 정기 연차` 등) 가시성 정밀화 |
 | **18** | 로그인 데모 계정 안내 삭제 및 ID(이메일) 저장 기능 탑재 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L2095-L2245) | 로그인 화면에서 데모 계정 박스를 전면 삭제하고 `localStorage`와 연동되는 **`ID(이메일 주소) 저장`** 체크박스 기능 탑재 |
 | **19** | 일괄 등록 연차 수정/일괄 종류 변경 (Batch Converter) 구축 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L318-L360), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1500-L1900) | ① `HistoryModal` 내 다중선택 체크박스 및 **[선택 건 휴가종류 일괄 변경]** (연차 ➔ 예비군/무급연차/임산부단축근무 등) 바 추가 → 일괄 등록 오류 건 즉시 정상 재계산. ② 항목별 개별 [수정] (`EditLeaveModal`) 및 [삭제] 기능 제공. ③ 결재 관리 탭 내 관리자 [수정] 버튼 탑재 |
+| **20** | 반차/오후반차 0.5일 변환 지원 및 소멸 예정 연차 보존 기능 구축 | **완료** | [leaveCalc.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/utils/leaveCalc.ts#L105-L115), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L25-L38) | ① `BASE_LEAVE_TYPES`에 `오전반차(am_half)`, `오후반차(pm_half)` 공식 등록 및 `leaveCalc.ts` 0.5일 자동 연차 차감 산출 연동. ② `EditLeaveModal` 내 단일일자 변경 시 0.5일 유지 보정 및 `[1일]`, `[0.5일(반차)]`, `[0.25일]` 퀵 셋 버튼 제공. ③ `HistoryModal` 내 소멸 예정 연차 활용 팁 카드 및 **[+ 소멸 연차 보존 (1일 선사용 등록)]** 원클릭 지원 |
 
 ---
 

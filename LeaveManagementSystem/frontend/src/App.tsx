@@ -26,6 +26,8 @@ import { formatPhone, formatBizRegNo } from './utils/format';
 
 const BASE_LEAVE_TYPES = [
   { id: 'annual', label: '연차', color: '#4F46E5', bg: '#EEF2FF', exempt: false, fixed: true },
+  { id: 'am_half', label: '오전반차', color: '#6366F1', bg: '#EEF2FF', exempt: false, fixed: true, defaultUnit: 0.5 },
+  { id: 'pm_half', label: '오후반차', color: '#4338CA', bg: '#EEF2FF', exempt: false, fixed: true, defaultUnit: 0.5 },
   { id: 'military', label: '예비군/민방위', color: '#D97706', bg: '#FFFBEB', exempt: true, fixed: true },
   { id: 'maternity', label: '출산전후휴가', color: '#7C3AED', bg: '#F5F3FF', exempt: true, fixed: true },
   { id: 'parental', label: '육아휴직', color: '#0891B2', bg: '#ECFEFF', exempt: true, fixed: true, isLeaveOfAbsence: true },
@@ -1306,16 +1308,26 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
   const [endDate, setEndDate] = useState(() => formatDateStr(leave.end_date));
   const [saving, setSaving] = useState(false);
 
+  const handleTypeChange = (newType: string) => {
+    setType(newType);
+    const targetObj = leaveTypes.find(t => t.id === newType);
+    if (targetObj?.defaultUnit) {
+      setUnit(targetObj.defaultUnit);
+    } else if (newType === 'am_half' || newType === 'pm_half') {
+      setUnit(0.5);
+    }
+  };
+
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
-    if (val && endDate) {
+    if (val && endDate && val !== endDate) {
       setUnit(daysInRange(val, endDate));
     }
   };
 
   const handleEndDateChange = (val: string) => {
     setEndDate(val);
-    if (startDate && val) {
+    if (startDate && val && startDate !== val) {
       setUnit(daysInRange(startDate, val));
     }
   };
@@ -1352,7 +1364,7 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">휴가 종류 (구분)</label>
-            <select value={type} onChange={e => setType(e.target.value)} className="input-field">
+            <select value={type} onChange={e => handleTypeChange(e.target.value)} className="input-field">
               {leaveTypes.map(t => (
                 <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '연차차감제외' : '연차차감'})</option>
               ))}
@@ -1363,6 +1375,11 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">사용 일수 (unit)</label>
               <input type="number" step="0.25" value={unit} onChange={e => setUnit(parseFloat(e.target.value) || 0)} className="input-field" />
+              <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                <button type="button" className="btn" onClick={() => setUnit(1.0)} style={{ padding: '2px 6px', fontSize: 10, background: unit === 1.0 ? 'var(--primary-light)' : '#fff', color: unit === 1.0 ? 'var(--primary)' : 'var(--gray-600)' }}>1일</button>
+                <button type="button" className="btn" onClick={() => setUnit(0.5)} style={{ padding: '2px 6px', fontSize: 10, background: unit === 0.5 ? 'var(--primary-light)' : '#fff', color: unit === 0.5 ? 'var(--primary)' : 'var(--gray-600)' }}>0.5일 (반차)</button>
+                <button type="button" className="btn" onClick={() => setUnit(0.25)} style={{ padding: '2px 6px', fontSize: 10, background: unit === 0.25 ? 'var(--primary-light)' : '#fff', color: unit === 0.25 ? 'var(--primary)' : 'var(--gray-600)' }}>0.25일 (반반차)</button>
+              </div>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">결재 상태 (status)</label>
@@ -1751,7 +1768,42 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
           </div>
 
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)', marginBottom: 10 }}>회차별 연차 생성 이력</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)' }}>회차별 연차 생성 이력</div>
+              <button 
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (confirm(`${emp.name}님에게 1일 연차 선사용(사전승인)을 등록하여 소멸 예정 연차 1일을 보존/사용할 수 있도록 등록하시겠습니까?`)) {
+                    try {
+                      await leaveAPI.applyLeave({
+                        type: 'unearned_annual',
+                        unit: 1,
+                        startDate: todayStr(),
+                        endDate: todayStr(),
+                        reason: '소멸 예정 연차 보존 (사전 승인 1일 사용)',
+                        empId: emp.id
+                      });
+                      alert('1일 연차 선사용(사전승인)이 성공적으로 등록되었습니다.');
+                      onRefresh();
+                    } catch (err: any) {
+                      alert(err.response?.data?.message || '등록 실패');
+                    }
+                  }
+                }}
+                style={{ padding: '4px 10px', fontSize: 11, gap: 4 }}
+              >
+                + 소멸 연차 보존 (1일 선사용 등록)
+              </button>
+            </div>
+
+            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', padding: '10px 12px', borderRadius: 8, fontSize: 11, color: '#92400E', marginBottom: 12 }}>
+              <strong>💡 소멸 예정 연차 활용/보존 방안 안내:</strong>
+              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                <li><strong>이월 처리</strong>: 환경설정 탭에서 연차 처분 방식을 <code>다음 주기로 이월(carryover)</code>로 설정하시면 미사용 소멸 연차가 다음 회차로 자동 이월됩니다.</li>
+                <li><strong>선사용/반차 활용</strong>: 소멸 예정 연차가 있더라도 <code>오후/오전반차(0.5일)</code> 또는 <code>연차 선사용(사전승인)</code>으로 1일 또는 반차 단위로 당겨서 활용할 수 있습니다.</li>
+              </ul>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {balance.allCycles.map((c, ci) => {
                 const isActive = balance.activeCycle?.startDate === c.startDate && balance.activeCycle?.endDate === c.endDate;

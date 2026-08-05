@@ -109,7 +109,7 @@ export function calculateLeaveCycles(
 
   const cycles: LeaveCycle[] = [];
   const approvedAnnualLeaves = leaves.filter(
-    (l) => (l.type === 'annual' || l.type === 'unearned_annual') && l.status === 'approved'
+    (l) => (l.type === 'annual' || l.type === 'unearned_annual' || l.type === 'am_half' || l.type === 'pm_half') && l.status === 'approved'
   );
 
   if (basisType === 'join') {
