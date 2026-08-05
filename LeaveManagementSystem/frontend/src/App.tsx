@@ -423,9 +423,9 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
-  const myCompanyEmps = useMemo(() =>
-    isAdmin ? employees.filter(e => e.company_id === currentUser.company_id && e.role !== 'admin') : [currentUser],
-  [employees, isAdmin, currentUser]);
+  const companyEmployees = useMemo(() =>
+    employees.filter(e => e.company_id === currentUser.company_id),
+  [employees, currentUser]);
 
   const visibleEmps = useMemo(() => {
     const myCard = employees.find(e => e.id === currentUser.id);
@@ -436,7 +436,6 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
     const cards = [];
     if (myCard) cards.push(myCard);
     
-    const companyEmployees = employees.filter(e => e.company_id === currentUser.company_id);
     const otherLeaves = leaves.filter(l => l.emp_id !== currentUser.id && companyEmployees.some(e => e.id === l.emp_id));
     const sortedOtherLeaves = [...otherLeaves].sort((a, b) => b.start_date.localeCompare(a.start_date) || b.id.localeCompare(a.id));
     const recentLeave = sortedOtherLeaves[0];
@@ -448,7 +447,7 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
       }
     }
     return cards;
-  }, [employees, currentUser, isAdmin, leaves]);
+  }, [employees, currentUser, isAdmin, leaves, companyEmployees]);
 
   const monthCells = useMemo(() => {
     const y = viewDate.getFullYear(), m = viewDate.getMonth();
@@ -465,9 +464,8 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
   }, [viewDate]);
 
   const allLeaves = useMemo(() =>
-    isAdmin ? leaves.filter(l => myCompanyEmps.some(e => e.id === l.emp_id) && l.status === 'approved')
-            : leaves.filter(l => l.emp_id === currentUser.id && l.status === 'approved'),
-  [leaves, isAdmin, myCompanyEmps, currentUser]);
+    leaves.filter(l => companyEmployees.some(e => e.id === l.emp_id) && l.status === 'approved'),
+  [leaves, companyEmployees]);
 
   const leavesByDay = useMemo(() => {
     const map: Record<string, Leave[]> = {};
@@ -506,7 +504,7 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {isAdmin && leaves.some(l => l.status === 'pending' && l.reason?.includes('한도초과') && myCompanyEmps.some(e => e.id === l.emp_id)) && (
+      {isAdmin && leaves.some(l => l.status === 'pending' && l.reason?.includes('한도초과') && companyEmployees.some(e => e.id === l.emp_id)) && (
         <div className="glass-card animate-scale" style={{ background: '#FFFBEB', borderLeft: '4px solid #D97706', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #FDE68A' }}>
           <ShieldAlert size={20} style={{ color: '#D97706', flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
@@ -520,13 +518,13 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
       {isAdmin && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
           {[
-            { label: '전체 관리 직원', value: myCompanyEmps.length + '명', icon: Users, color: 'var(--primary)' },
-            { label: '재직 직원', value: myCompanyEmps.filter(e => e.status === 'active').length + '명', icon: Briefcase, color: 'var(--success)' },
+            { label: '전체 관리 직원', value: companyEmployees.length + '명', icon: Users, color: 'var(--primary)' },
+            { label: '재직 직원', value: companyEmployees.filter(e => e.status === 'active').length + '명', icon: Briefcase, color: 'var(--success)' },
             { label: '이번 달 승인 휴가', value: leaves.filter(l => {
               const d = new Date(l.start_date);
-              return myCompanyEmps.some(e => e.id === l.emp_id) && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear() && l.status === 'approved';
+              return companyEmployees.some(e => e.id === l.emp_id) && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear() && l.status === 'approved';
             }).length + '건', icon: CalendarIcon, color: 'var(--warning)' },
-            { label: '승인 대기 건수', value: leaves.filter(l => myCompanyEmps.some(e => e.id === l.emp_id) && l.status === 'pending').length + '건', icon: Clock, color: 'var(--danger)' },
+            { label: '승인 대기 건수', value: leaves.filter(l => companyEmployees.some(e => e.id === l.emp_id) && l.status === 'pending').length + '건', icon: Clock, color: 'var(--danger)' },
           ].map((m, i) => (
             <div key={i} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem' }}>
               <div>
@@ -623,7 +621,7 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--gray-900)' }}>최근 승인된 연차 / 반차 신청 이력</span>
+            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--gray-900)' }}>최근 승인된 휴가 신청 이력</span>
           </div>
           <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>최신 승인 내역 {Math.min(recentApprovedLeaves.length, 10)}건</span>
         </div>
@@ -636,17 +634,25 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 10 }}>
             {recentApprovedLeaves.map((l, idx) => {
               const lt = leaveTypes.find(x => x.id === l.type);
-              const label = lt?.label || (l.type === 'am_half' ? '오전반차' : l.type === 'pm_half' ? '오후반차' : l.type);
+              const label = lt?.label || (l.type === 'am_half' ? '오전반차' : l.type === 'pm_half' ? '오후반차' : l.type === 'annual' ? '연차' : l.type);
+              const empName = l.emp_name || employees.find(e => e.id === l.emp_id)?.name || '직원';
               const dateRange = formatDateStr(l.start_date) === formatDateStr(l.end_date)
                 ? formatDateStr(l.start_date)
                 : `${formatDateStr(l.start_date)} ~ ${formatDateStr(l.end_date)}`;
 
+              let dotColor = 'var(--primary)';
+              if (lt?.custom === 'family' || l.type.includes('경조') || label.includes('경조')) {
+                dotColor = '#B45309';
+              } else if (lt?.custom === 'general' || l.type.includes('회사') || label.includes('회사')) {
+                dotColor = '#059669';
+              }
+
               return (
                 <div key={l.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: lt?.color || 'var(--primary)' }} />
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--gray-900)' }}>{l.emp_name}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--gray-900)' }}>{empName}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: dotColor, background: `${dotColor}15`, padding: '2px 8px', borderRadius: 10 }}>
                       {label} ({l.unit}일)
                     </span>
                   </div>
@@ -719,7 +725,13 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       {dayLeaves.slice(0, 3).map((l, li) => {
                         const lt = leaveTypes.find(x => x.id === l.type);
-                        const labelText = lt?.label || (l.type === 'pm_half' ? '오후반차' : l.type === 'am_half' ? '오전반차' : '연차');
+                        const labelText = lt?.label || (
+                          l.type === 'pm_half' ? '오후반차' : 
+                          l.type === 'am_half' ? '오전반차' : 
+                          l.type === 'annual' ? '연차' : 
+                          l.type
+                        );
+                        const empName = l.emp_name || employees.find(e => e.id === l.emp_id)?.name || '직원';
                         
                         // Categorize colors
                         let badgeColor = '#4F46E5';
@@ -733,7 +745,7 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                         } else if (l.type === 'unpaid_annual') {
                           badgeColor = '#6B7280';
                           badgeBg = '#F3F4F6';
-                        } else if (lt?.custom === 'family') {
+                        } else if (lt?.custom === 'family' || l.type.includes('경조') || labelText.includes('경조')) {
                           badgeColor = '#B45309';
                           badgeBg = '#FFFBEB';
                         } else {
@@ -745,14 +757,14 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                           <div 
                             key={li} 
                             className="calendar-leave-badge"
-                            title={`${l.emp_name} · ${labelText}`}
+                            title={`${empName} · ${labelText}`}
                             style={{ 
                               background: badgeBg, 
                               color: badgeColor,
                               borderLeft: `3px solid ${badgeColor}`
                             }}
                           >
-                            {l.emp_name} ({labelText})
+                            {empName} ({labelText})
                           </div>
                         );
                       })}
