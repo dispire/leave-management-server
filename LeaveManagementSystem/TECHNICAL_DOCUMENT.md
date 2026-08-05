@@ -81,6 +81,7 @@ graph TD
 | **25** | 날짜 범위 변경 시 사용단위 UI 레이아웃 고정 및 로딩 속도 최적화 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L148-L185), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L875-L905) | ① `ApplyLeave` 탭 사용 단위 필드가 날짜 변경 시 사러지던 오동작 수정 ➔ 기간 지정 시 `8일 (자동 산출)` 읽기 전용 모드로 UI 고정 보정. ② `loadAppData` 갱신 시 화면 차단 스피너(`dataLoading`) 제거 및 캐시 우선 렌더 ➔ 0.01초 즉시 반응 및 백그라운드 동기화로 속도 10배 최적화 |
 | **26** | 반차 사용단위 0.5일 고정 및 대시보드 승인 이력/캘린더 렌더링 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L470-L720), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L880-L900) | ① `ApplyLeave` 탭에서 오전반차/오후반차 선택 시 `0.5일 (반차 고정)` 필드로 비활성 고정. ② Dashboard 내 `leavesByDay` 타임존 날짜 누락 보정 및 `최근 승인된 연차/반차 이력` 위젯 신설 |
 | **27** | 대시보드 회사휴가/경조휴가 및 관리자/직원 전체 승인 휴가 표시 누락 수정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L426-L760) | ① `myCompanyEmps` 내 `role !== 'admin'` 필터 제거 ➔ 이광희 등 관리자 계정 승인 휴가 대시보드 누락 수정. ② 일반 직원 계정 캘린더 `allLeaves` 범위 확대 ➔ 회사휴가/경조휴가/동료 승인 휴가 캘린더 정상 표출. ③ 캘린더 범주 라벨 및 색상(Emerald/Amber/Indigo) 매칭 보정 |
+| **28** | 신규 직원 회원가입 관리자 승인제 구축 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L88-L100), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L226-L260), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1650-L1850) | ① 기존 회사 선택 회원가입 시 계정 상태 `pending(가입 승인 대기)`으로 세팅. ② 승인 대기 계정 로그인 시 차단 및 안내 문구 표출. ③ 대시보드 및 직원 관리 탭 내 **[가입 승인 대기 목록]** 신설 및 관리자 **[승인] / [거절]** 원클릭 지원 |
 
 ---
 
@@ -148,6 +149,20 @@ graph TD
   1. `companyEmployees`: 현재 로그인 사용자와 동일한 `company_id`를 가진 전체 임직원(관리자 + 일반 사원)으로 범위를 정상화.
   2. `allLeaves`: 관리자 및 일반 사원 모두 소속 회사의 전체 승인 휴가를 대시보드 캘린더 및 최근 승인 이력 위젯에 표출하도록 연동.
   3. **캘린더 라벨 및 색상 매칭 보정**: `leaveTypes` 매칭 실패 시 원본 `l.type`을 Fallback 라벨로 사용하고, 경조휴가(Amber), 회사휴가(Emerald), 연차/반차(Indigo) 범주별 색상이 캘린더 및 위젯 배지에 정확히 반영되도록 정밀화.
+
+### 4.8. 신규 직원 회원가입 관리자 승인제 (New Employee Registration Approval Workflow)
+* **배경 및 요구사항**:
+  기존에는 신규 가입 시 회사를 선택하여 가입하면 즉시 `active` 상태가 되어 시스템을 바로 이용할 수 있었으나, 승인되지 않은 사용자의 무단 접속을 방지하기 위해 관리자 승인 절차를 도입하였습니다.
+* **구현 세부 사항**:
+  1. **가입 상태 세팅 (`status: 'pending'`)**:
+     * 신규 회사 등록 가입 시: 개설자 본인이 관리자(`role: 'admin'`)가 되므로 즉시 `active` 처리됩니다.
+     * 기존 회사 선택 가입 시: 가입 즉시 계정 상태가 `pending`(가입 승인 대기)으로 데이터베이스에 등록됩니다.
+  2. **승인 대기 계정 로그인 제어**:
+     * `login` 및 세션 로딩 시 계정 상태가 `pending`인 경우 즉시 세션을 파기하고 안내 메시지(*"가입 승인 대기 중인 계정입니다. 회사 관리자의 승인 후 로그인할 수 있습니다."*)를 표출하여 접근을 차단합니다.
+  3. **관리자 승인 및 거절 UI 구축**:
+     * **대시보드 상단 알림 배너**: 승인 대기 중인 임직원이 존재하는 경우 대시보드 상단에 🔔 알림 경고 카드를 표출합니다.
+     * **직원 관리 탭 승인 대기 리스트 위젯**: **[가입 승인 대기 직원 목록]** 전용 섹션을 신설하여 신규 신청자의 이름, 이메일, 입사일, 부서 정보와 함께 **[승인]** 및 **[거절]** 버튼을 제공합니다.
+     * **원클릭 결재 처리**: 관리자가 **[승인]** 클릭 시 `employeeAPI.updateEmployee(empId, { status: 'active' })`를 호출하여 계정을 즉시 활성화 처리합니다.
 
 ---
 
