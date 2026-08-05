@@ -144,9 +144,9 @@ export default function App() {
     return [...filteredBase, ...gen, ...fam];
   }, [company]);
 
-  // bypassCache=true: 쓰기 작업 후 강제 새로 고침, false: 캐시 우선 사용
-  const loadAppData = async (bypassCache = true) => {
-    setDataLoading(true);
+  // bypassCache=false: 캐시 우선 사용 (0ms 렌더링), showSpinner=false: 백그라운드 갱신
+  const loadAppData = async (bypassCache = false, showSpinner = false) => {
+    if (showSpinner) setDataLoading(true);
     try {
       const [compData, empsData, leavesData] = await Promise.all([
         companyAPI.getCompany(bypassCache),
@@ -182,7 +182,7 @@ export default function App() {
     } catch (err) {
       console.error('Error loading app data:', err);
     } finally {
-      setDataLoading(false);
+      if (showSpinner) setDataLoading(false);
     }
   };
 
@@ -876,18 +876,30 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
           </select>
         </div>
 
-        {!isExempt && !isFamily && (startDate === endDate || !startDate || !endDate) && (
+        {!isExempt && !isFamily && (
           <div className="input-group">
-            <label className="input-label">사용 단위 (단일 일자 신청 시)</label>
-            <select 
-              value={unit} 
-              onChange={e => setUnit(e.target.value)} 
-              className="input-field"
-            >
-              <option value="1">1일 (종일)</option>
-              <option value="0.5">0.5일 (반차)</option>
-              <option value="0.25">0.25일 (반반차)</option>
-            </select>
+            <label className="input-label">
+              사용 단위 {startDate && endDate && startDate !== endDate ? '(기간 지정 시 자동계산)' : ''}
+            </label>
+            {startDate && endDate && startDate !== endDate ? (
+              <input
+                type="text"
+                disabled
+                value={`${calculatedDays}일 (${startDate} ~ ${endDate} 자동 산출)`}
+                className="input-field"
+                style={{ background: '#f1f5f9', color: 'var(--gray-700)', fontWeight: 600 }}
+              />
+            ) : (
+              <select 
+                value={unit} 
+                onChange={e => setUnit(e.target.value)} 
+                className="input-field"
+              >
+                <option value="1">1일 (종일)</option>
+                <option value="0.5">0.5일 (반차)</option>
+                <option value="0.25">0.25일 (반반차)</option>
+              </select>
+            )}
           </div>
         )}
 
