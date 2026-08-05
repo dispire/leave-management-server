@@ -52,7 +52,9 @@ function fmtUnit(u: number) {
 function formatDateStr(dateStr: string) {
   if (!dateStr) return '';
   try {
-    return formatLocalDate(parseLocalDate(dateStr));
+    const d = parseLocalDate(dateStr);
+    if (isNaN(d.getTime())) return dateStr.slice(0, 10);
+    return formatLocalDate(d);
   } catch {
     return dateStr.slice(0, 10);
   }
@@ -547,7 +549,7 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
       {isAdmin && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
           {[
-            { label: '전체 관리 직원', value: companyEmployees.length + '명', icon: Users, color: 'var(--primary)' },
+            { label: '전체 관리 직원', value: companyEmployees.filter(e => e.status !== 'pending').length + '명', icon: Users, color: 'var(--primary)' },
             { label: '재직 직원', value: companyEmployees.filter(e => e.status === 'active').length + '명', icon: Briefcase, color: 'var(--success)' },
             { label: '이번 달 승인 휴가', value: leaves.filter(l => {
               const d = new Date(l.start_date);
@@ -871,12 +873,14 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
 
   const submit = async () => {
     if (!startDate || !endDate) return alert('시작일과 종료일을 선택해주세요.');
+    if (endDate < startDate) return alert('종료일은 시작일보다 빠를 수 없습니다.');
     let u: number;
-    if (isExempt || isFamily || startDate !== endDate) {
+    if (isExempt || isFamily || isGeneral || startDate !== endDate) {
       u = daysInRange(startDate, endDate);
     } else {
       u = parseFloat(unit);
     }
+    if (isNaN(u) || u <= 0) return alert('사용 일수가 올바르지 않습니다.');
 
     let isExceeded = false;
     if ((type === 'annual' || type === 'unearned_annual') && u > remaining) {
@@ -891,7 +895,7 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
     if (isGeneral) {
       const gt = generalTypes.find(g => g.id === type);
       if (gt && u > getGeneralRemaining(gt)) {
-        return alert(`이번 달 잔여 ${gt.label}이 부족합니다.`);
+        return alert(`이번 달 잔여 ${gt.label}이 부족합니다. (잔여: ${getGeneralRemaining(gt)}일, 신청: ${u}일)`);
       }
     }
     if (isFamily) {
@@ -1741,7 +1745,7 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
       </div>
 
       {pendingEmps.length > 0 && (
-        <div className="glass-card animate-scale" style={{ background: '#EFF6FF', border: '1.5.px solid #60A5FA', padding: '1.25rem' }}>
+        <div className="glass-card animate-scale" style={{ background: '#EFF6FF', border: '1.5px solid #60A5FA', padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <UserPlus size={18} style={{ color: '#2563EB' }} />
@@ -2502,7 +2506,7 @@ function CompanySettings({ company, employees, currentUser, onSave }: {
             
             <div style={{ padding: '10px 12px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 8, fontSize: 11, lineHeight: 1.5, border: '1px solid var(--primary-border)50' }}>
               <strong>💡 기준 변경 시 영향</strong><br />
-              기준 구분을 변경하면 소속 임직원의 연차 가용 일수가 즉시 새 공식에 따라 실시간으로 재산울됩니다.
+              기준 구분을 변경하면 소속 임직원의 연차 가용 일수가 즉시 새 공식에 따라 실시간으로 재산출됩니다.
             </div>
           </div>
 

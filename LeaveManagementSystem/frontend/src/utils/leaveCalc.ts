@@ -27,11 +27,12 @@ export interface LeaveRequest {
  * and handles plain YYYY-MM-DD (or YYYY-MM-DD HH:MM) by manual splitting.
  */
 export function parseLocalDate(dateStr: string | any): Date {
-  if (!dateStr) return new Date();
+  if (!dateStr) return new Date(NaN); // Return invalid Date instead of "today" to prevent silently wrong calculations
   if (dateStr instanceof Date) {
     return new Date(dateStr.getFullYear(), dateStr.getMonth(), dateStr.getDate());
   }
-  const str = String(dateStr);
+  const str = String(dateStr).trim();
+  if (!str || str === 'undefined' || str === 'null') return new Date(NaN);
   
   if (str.includes('T') || str.includes('Z')) {
     const d = new Date(str);
@@ -41,9 +42,11 @@ export function parseLocalDate(dateStr: string | any): Date {
   }
   
   const parts = str.slice(0, 10).split('-');
-  const y = parseInt(parts[0]) || 2026;
+  if (parts.length < 3) return new Date(NaN);
+  const y = parseInt(parts[0]);
   const m = (parseInt(parts[1]) || 1) - 1;
   const d = parseInt(parts[2]) || 1;
+  if (isNaN(y) || y < 1900 || y > 2200) return new Date(NaN);
   return new Date(y, m, d);
 }
 
@@ -84,6 +87,7 @@ export function daysInRange(startDate: string, endDate: string): number {
   if (!startDate || !endDate) return 0;
   const s = parseLocalDate(startDate);
   const e = parseLocalDate(endDate);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
   return Math.max(1, getDaysDiff(s, e) + 1);
 }
 
