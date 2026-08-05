@@ -1302,9 +1302,23 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
   const [unit, setUnit] = useState(leave.unit);
   const [status, setStatus] = useState<'pending' | 'approved' | 'rejected'>(leave.status);
   const [reason, setReason] = useState(leave.reason || '');
-  const [startDate, setStartDate] = useState(leave.start_date);
-  const [endDate, setEndDate] = useState(leave.end_date);
+  const [startDate, setStartDate] = useState(() => formatDateStr(leave.start_date));
+  const [endDate, setEndDate] = useState(() => formatDateStr(leave.end_date));
   const [saving, setSaving] = useState(false);
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    if (val && endDate) {
+      setUnit(daysInRange(val, endDate));
+    }
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    if (startDate && val) {
+      setUnit(daysInRange(startDate, val));
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -1363,11 +1377,11 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">시작일</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="input-field" />
+              <input type="date" value={startDate} onChange={e => handleStartDateChange(e.target.value)} className="input-field" />
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">종료일</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="input-field" />
+              <input type="date" value={endDate} onChange={e => handleEndDateChange(e.target.value)} className="input-field" />
             </div>
           </div>
 
