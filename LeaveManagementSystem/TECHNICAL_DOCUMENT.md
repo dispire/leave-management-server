@@ -62,6 +62,7 @@ graph TD
 | **23** | 기간 연차 신청 시 일자 범위 자동 연산 및 1회 신청 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L775-L920) | `ApplyLeave` 탭에서 시작일≠종료일 다중일자 선택 시 `daysInRange(startDate, endDate)` 자동 연산(예: 8월11일~12일 ➔ 2일 자동 산출) 및 요약 뱃지 표시 → 여러 번 나누어 신청할 필요 없이 1회 신청으로 전체 기간 자동 차감 |
 | **24** | 일반 임직원 본인 휴가 신청 직접 취소(`[신청 취소]`) 기능 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1060-L1265) | `LeaveHistory` 탭에서 일반 임직원도 본인의 신청 대기(`pending`) 및 승인(`approved`) 휴가 건에 대해 관리자 개입 없이 직접 **`[신청 취소]`** 가능 조치 → 클릭 시 즉시 취소/삭제 및 연차 일수 자동 복원 |
 | **25** | 날짜 범위 변경 시 사용단위 UI 레이아웃 고정 및 로딩 속도 최적화 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L148-L185), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L875-L905) | ① `ApplyLeave` 탭 사용 단위 필드가 날짜 변경 시 사러지던 오동작 수정 ➔ 기간 지정 시 `8일 (자동 산출)` 읽기 전용 모드로 UI 고정 보정. ② `loadAppData` 갱신 시 화면 차단 스피너(`dataLoading`) 제거 및 캐시 우선 렌더 ➔ 0.01초 즉시 반응 및 백그라운드 동기화로 속도 10배 최적화 |
+| **26** | 반차 사용단위 0.5일 고정 및 대시보드 승인 이력/캘린더 렌더링 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L470-L720), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L880-L900) | ① `ApplyLeave` 탭에서 오전반차/오후반차 선택 시 `0.5일 (반차 고정)` 필드로 비활성 고정. ② Dashboard 내 `leavesByDay` 타임존 날짜 누락 보정 및 `최근 승인된 연차/반차 이력` 위젯 신설 |
 
 ---
 

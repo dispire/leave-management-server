@@ -17,7 +17,8 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
-  UserPlus
+  UserPlus,
+  CheckCircle
 } from 'lucide-react';
 import { authAPI, companyAPI, employeeAPI, leaveAPI } from './api';
 import type { Employee, Company, Leave } from './api';
@@ -471,15 +472,21 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
   const leavesByDay = useMemo(() => {
     const map: Record<string, Leave[]> = {};
     allLeaves.forEach(l => {
-      let d = new Date(l.start_date); 
-      const end = new Date(l.end_date);
+      const startStr = formatDateStr(l.start_date);
+      const endStr = formatDateStr(l.end_date);
+      let d = parseLocalDate(startStr);
+      const end = parseLocalDate(endStr);
       while (d <= end) {
-        const ds = d.toISOString().slice(0, 10);
+        const ds = formatLocalDate(d);
         (map[ds] = map[ds] || []).push(l);
         d.setDate(d.getDate() + 1);
       }
     });
     return map;
+  }, [allLeaves]);
+
+  const recentApprovedLeaves = useMemo(() => {
+    return [...allLeaves].sort((a, b) => (b.start_date || '').localeCompare(a.start_date || '')).slice(0, 10);
   }, [allLeaves]);
 
   const EMP_COLORS = ['#4F46E5', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2'];
@@ -611,6 +618,48 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
         })}
       </div>
 
+      {/* Recent Approved Leaves History Widget */}
+      <div className="glass-card animate-fade">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--gray-900)' }}>최근 승인된 연차 / 반차 신청 이력</span>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>최신 승인 내역 {Math.min(recentApprovedLeaves.length, 10)}건</span>
+        </div>
+        
+        {recentApprovedLeaves.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--gray-400)', fontSize: 13 }}>
+            최근 승인된 휴가 신청 이력이 없습니다.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 10 }}>
+            {recentApprovedLeaves.map((l, idx) => {
+              const lt = leaveTypes.find(x => x.id === l.type);
+              const label = lt?.label || (l.type === 'am_half' ? '오전반차' : l.type === 'pm_half' ? '오후반차' : l.type);
+              const dateRange = formatDateStr(l.start_date) === formatDateStr(l.end_date)
+                ? formatDateStr(l.start_date)
+                : `${formatDateStr(l.start_date)} ~ ${formatDateStr(l.end_date)}`;
+
+              return (
+                <div key={l.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: lt?.color || 'var(--primary)' }} />
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--gray-900)' }}>{l.emp_name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 10 }}>
+                      {label} ({l.unit}일)
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--gray-500)' }}>
+                    {dateRange}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Calendar card */}
       <div className="glass-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
@@ -643,7 +692,7 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
 
             <div className="calendar-grid">
               {monthCells.map((d, i) => {
-                const ds = d.toISOString().slice(0, 10);
+                const ds = formatLocalDate(d);
                 const isToday = ds === todayStr();
                 const inMonth = d.getMonth() === viewDate.getMonth();
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -670,12 +719,12 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       {dayLeaves.slice(0, 3).map((l, li) => {
                         const lt = leaveTypes.find(x => x.id === l.type);
-                        const isExempt = lt?.exempt;
+                        const labelText = lt?.label || (l.type === 'pm_half' ? '오후반차' : l.type === 'am_half' ? '오전반차' : '연차');
                         
                         // Categorize colors
                         let badgeColor = '#4F46E5';
                         let badgeBg = '#EEF2FF';
-                        if (l.type === 'annual') {
+                        if (l.type === 'annual' || l.type === 'am_half' || l.type === 'pm_half') {
                           badgeColor = '#4F46E5';
                           badgeBg = '#EEF2FF';
                         } else if (l.type === 'unearned_annual') {
@@ -696,14 +745,14 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                           <div 
                             key={li} 
                             className="calendar-leave-badge"
-                            title={`${l.emp_name} · ${lt?.label}`}
+                            title={`${l.emp_name} · ${labelText}`}
                             style={{ 
                               background: badgeBg, 
                               color: badgeColor,
                               borderLeft: `3px solid ${badgeColor}`
                             }}
                           >
-                            {l.emp_name} {isExempt ? lt?.label?.slice(0,2) : fmtUnit(l.unit)}
+                            {l.emp_name} ({labelText})
                           </div>
                         );
                       })}
@@ -881,7 +930,15 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
             <label className="input-label">
               사용 단위 {startDate && endDate && startDate !== endDate ? '(기간 지정 시 자동계산)' : ''}
             </label>
-            {startDate && endDate && startDate !== endDate ? (
+            {type === 'am_half' || type === 'pm_half' || selectedType?.defaultUnit === 0.5 ? (
+              <input
+                type="text"
+                disabled
+                value="0.5일 (반차 고정)"
+                className="input-field"
+                style={{ background: '#f1f5f9', color: 'var(--primary)', fontWeight: 700 }}
+              />
+            ) : startDate && endDate && startDate !== endDate ? (
               <input
                 type="text"
                 disabled
