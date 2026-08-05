@@ -193,6 +193,14 @@ export default function App() {
       try {
         const authInfo = await authAPI.me();
         if (authInfo.logged_in && authInfo.user) {
+          if (authInfo.user.status === 'pending') {
+            await authAPI.logout();
+            const list = await authAPI.listCompanies();
+            setCompaniesList(list);
+            setLoading(false);
+            alert('가입 승인 대기 중인 계정입니다.\n회사 인사 관리자의 가입 승인 완료 후 로그인할 수 있습니다.');
+            return;
+          }
           setCurrentUser(authInfo.user);
           setScreen('app');
           setDataLoading(true);
@@ -228,6 +236,12 @@ export default function App() {
     try {
       const res = await authAPI.login(email, password);
       if (res.success && res.user) {
+        if (res.user.status === 'pending') {
+          await authAPI.logout();
+          alert('가입 승인 대기 중인 계정입니다.\n회사 인사 관리자의 가입 승인 완료 후 로그인하실 수 있습니다.');
+          setLoading(false);
+          return;
+        }
         setCurrentUser(res.user);
         setScreen('app');
         setTab('dashboard');
@@ -271,7 +285,11 @@ export default function App() {
     try {
       const res = await authAPI.register(regData);
       if (res.success) {
-        alert('회원가입이 완료되었습니다! 로그인해주세요.');
+        if (regData.newCompanyName) {
+          alert('신규 회사가 성공적으로 등록되었습니다!\n생성하신 관리자 계정으로 로그인해주세요.');
+        } else {
+          alert('회원가입 신청이 완료되었습니다!\n회사 관리자의 가입 승인 완료 후 로그인하실 수 있습니다.');
+        }
         // Refresh companies list
         const list = await authAPI.listCompanies();
         setCompaniesList(list);
@@ -511,6 +529,17 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
             <div style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>⚠️ 연차 보유 한도 초과 신청 감지</div>
             <div style={{ fontSize: 12, color: '#B45309', marginTop: 2 }}>
               소속 직원이 연차 한도를 초과하여 신청한 휴가 결재 대기 건이 존재합니다. <strong>[신청/결재 관리]</strong> 탭에서 사유를 확인하고 결재해 주십시오.
+            </div>
+          </div>
+        </div>
+      )}
+      {isAdmin && companyEmployees.some(e => e.status === 'pending') && (
+        <div className="glass-card animate-scale" style={{ background: '#EFF6FF', borderLeft: '4px solid #3B82F6', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #BFDBFE' }}>
+          <UserPlus size={20} style={{ color: '#2563EB', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1E40AF' }}>🔔 신규 직원 회원가입 승인 대기 건 존재</div>
+            <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 2 }}>
+              신규 회원가입을 신청한 직원이 <strong>{companyEmployees.filter(e => e.status === 'pending').length}명</strong> 있습니다. <strong>[직원 관리]</strong> 탭에서 가입 승인 처리해 주십시오.
             </div>
           </div>
         </div>
@@ -1561,6 +1590,10 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
 
   const [sortBy, setSortBy] = useState<'default' | 'join_asc' | 'join_desc' | 'rem_asc' | 'rem_desc' | 'name_asc'>('default');
 
+  const pendingEmps = useMemo(() => 
+    employees.filter(e => e.company_id === currentUser.company_id && e.status === 'pending'),
+  [employees, currentUser]);
+
   const sortedEmps = useMemo(() => {
     const list = employees.filter(e => e.company_id === currentUser.company_id);
     if (sortBy === 'default') return list;
@@ -1587,6 +1620,34 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
       return 0;
     });
   }, [employees, currentUser, sortBy, leaves, company]);
+
+  const handleApproveRegistration = async (emp: Employee) => {
+    if (confirm(`${emp.name}님의 회원가입을 승인하시겠습니까?\n승인 시 즉시 시스템 로그인이 가능해집니다.`)) {
+      try {
+        const res = await employeeAPI.updateEmployee(emp.id, { status: 'active' });
+        if (res.success) {
+          alert(`${emp.name}님의 회원가입이 승인되었습니다.`);
+          onUpdate();
+        }
+      } catch (err: any) {
+        alert(err.response?.data?.message || '승인 처리 실패');
+      }
+    }
+  };
+
+  const handleRejectRegistration = async (emp: Employee) => {
+    if (confirm(`${emp.name}님의 회원가입 신청을 거절(삭제)하시겠습니까?`)) {
+      try {
+        const res = await employeeAPI.updateEmployee(emp.id, { status: 'resigned' });
+        if (res.success) {
+          alert(`${emp.name}님의 회원가입 신청이 거부되었습니다.`);
+          onUpdate();
+        }
+      } catch (err: any) {
+        alert(err.response?.data?.message || '거부 처리 실패');
+      }
+    }
+  };
 
   const startEdit = (emp: Employee) => {
     setEditId(emp.id);
@@ -1672,12 +1733,47 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)' }}>임직원 관리</h2>
-          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>소속 직원의 기본 정보 수정, 휴직 설정 및 퇴사 처리를 일괄 관리합니다.</p>
+          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>소속 직원의 기본 정보 수정, 가입 승인, 휴직 설정 및 퇴사 처리를 일괄 관리합니다.</p>
         </div>
         <button className="btn btn-primary" onClick={startAdd} style={{ gap: 6 }}>
           <UserPlus size={16} /> 직원 추가 등록
         </button>
       </div>
+
+      {pendingEmps.length > 0 && (
+        <div className="glass-card animate-scale" style={{ background: '#EFF6FF', border: '1.5.px solid #60A5FA', padding: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <UserPlus size={18} style={{ color: '#2563EB' }} />
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#1E40AF' }}>신규 회원가입 승인 대기 ({pendingEmps.length}명)</span>
+            </div>
+            <span style={{ fontSize: 11, color: '#3B82F6', fontWeight: 600 }}>관리자 승인 후 로그인 가능</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12 }}>
+            {pendingEmps.map(emp => (
+              <div key={emp.id} style={{ background: '#ffffff', borderRadius: 10, padding: '12px 16px', border: '1px solid #BFDBFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--gray-900)' }}>{emp.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>({emp.department || '부서 미지정'})</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 2 }}>{emp.email} · 입사일: {formatDateStr(emp.join_date)}</div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-primary" onClick={() => handleApproveRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
+                    <Check size={12} /> 승인
+                  </button>
+                  <button className="btn btn-danger" onClick={() => handleRejectRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
+                    <X size={12} /> 거절
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="glass-card animate-fade" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1796,6 +1892,8 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
                   <td>
                     {emp.status === 'resigned' ? (
                       <StatusBadge label={`퇴사 (${emp.resign_date || ''})`} color="var(--danger)" bg="var(--danger-light)" />
+                    ) : emp.status === 'pending' ? (
+                      <StatusBadge label="승인 대기" color="var(--warning)" bg="var(--warning-light)" />
                     ) : loaActive ? (
                       <StatusBadge label="휴직 중" color="var(--warning)" bg="var(--warning-light)" />
                     ) : (
@@ -1808,16 +1906,29 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: 6 }}>
-                      <button className="btn" onClick={() => setSelectedHistoryEmp(emp)} style={{ padding: '5px 10px', fontSize: 11, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>이력</button>
-                      <button className="btn" onClick={() => startEdit(emp)} style={{ padding: '5px 10px', fontSize: 11 }}>수정</button>
-                      <button className="btn" onClick={() => setLoaModal(emp)} style={{ padding: '5px 10px', fontSize: 11 }} disabled={emp.status === 'resigned'}>휴직설정</button>
-                      <button 
-                        className={`btn ${emp.status === 'resigned' ? 'btn-ghost' : 'btn-danger'}`} 
-                        onClick={() => toggleResign(emp)} 
-                        style={{ padding: '5px 10px', fontSize: 11 }}
-                      >
-                        {emp.status === 'resigned' ? '재직 전환' : '퇴사 처리'}
-                      </button>
+                      {emp.status === 'pending' ? (
+                        <>
+                          <button className="btn btn-primary" onClick={() => handleApproveRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
+                            <Check size={12} /> 승인
+                          </button>
+                          <button className="btn btn-danger" onClick={() => handleRejectRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
+                            <X size={12} /> 거절
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn" onClick={() => setSelectedHistoryEmp(emp)} style={{ padding: '5px 10px', fontSize: 11, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>이력</button>
+                          <button className="btn" onClick={() => startEdit(emp)} style={{ padding: '5px 10px', fontSize: 11 }}>수정</button>
+                          <button className="btn" onClick={() => setLoaModal(emp)} style={{ padding: '5px 10px', fontSize: 11 }} disabled={emp.status === 'resigned'}>휴직설정</button>
+                          <button 
+                            className={`btn ${emp.status === 'resigned' ? 'btn-ghost' : 'btn-danger'}`} 
+                            onClick={() => toggleResign(emp)} 
+                            style={{ padding: '5px 10px', fontSize: 11 }}
+                          >
+                            {emp.status === 'resigned' ? '재직 전환' : '퇴사 처리'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

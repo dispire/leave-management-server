@@ -94,7 +94,7 @@ export interface Employee {
   join_date: string;
   role: 'admin' | 'employee';
   department?: string;
-  status: 'active' | 'resigned';
+  status: 'active' | 'resigned' | 'pending';
   leave_of_absence?: { start: string; end: string | null } | null;
   resign_date?: string | null;
 }
