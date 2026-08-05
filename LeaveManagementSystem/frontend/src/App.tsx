@@ -1432,7 +1432,34 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
   const [loaModal, setLoaModal] = useState<Employee | null>(null);
   const [selectedHistoryEmp, setSelectedHistoryEmp] = useState<Employee | null>(null);
 
-  const myEmps = useMemo(() => employees.filter(e => e.company_id === currentUser.company_id), [employees, currentUser]);
+  const [sortBy, setSortBy] = useState<'default' | 'join_asc' | 'join_desc' | 'rem_asc' | 'rem_desc' | 'name_asc'>('default');
+
+  const sortedEmps = useMemo(() => {
+    const list = employees.filter(e => e.company_id === currentUser.company_id);
+    if (sortBy === 'default') return list;
+
+    const balanceMap = new Map<string, number>();
+    list.forEach(e => {
+      const bal = getCurrentLeaveBalance(
+        e.join_date,
+        leaves.filter(l => l.emp_id === e.id),
+        company?.basis_type,
+        company?.basis_date,
+        new Date(),
+        company?.leave_disposal ?? 'expire'
+      );
+      balanceMap.set(e.id, bal.remaining);
+    });
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'join_asc') return (a.join_date || '').localeCompare(b.join_date || '');
+      if (sortBy === 'join_desc') return (b.join_date || '').localeCompare(a.join_date || '');
+      if (sortBy === 'rem_asc') return (balanceMap.get(a.id) ?? 0) - (balanceMap.get(b.id) ?? 0);
+      if (sortBy === 'rem_desc') return (balanceMap.get(b.id) ?? 0) - (balanceMap.get(a.id) ?? 0);
+      if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '');
+      return 0;
+    });
+  }, [employees, currentUser, sortBy, leaves, company]);
 
   const startEdit = (emp: Employee) => {
     setEditId(emp.id);
@@ -1525,8 +1552,30 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
         </button>
       </div>
 
+      <div className="glass-card animate-fade" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-700)' }}>직원 표시 정렬:</span>
+          <select 
+            value={sortBy} 
+            onChange={e => setSortBy(e.target.value as any)} 
+            className="input-field" 
+            style={{ width: 'auto', padding: '4px 10px', fontSize: 12, margin: 0 }}
+          >
+            <option value="default">기본순 (DB 등록순)</option>
+            <option value="join_asc">입사일 오래된 순 (오름차순)</option>
+            <option value="join_desc">입사일 최신순 (내림차순)</option>
+            <option value="rem_asc">잔여연차 적은 순 (마이너스 순)</option>
+            <option value="rem_desc">잔여연차 많은 순 (내림차순)</option>
+            <option value="name_asc">이름 가나다순</option>
+          </select>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>
+          총 <strong style={{ color: 'var(--primary)' }}>{sortedEmps.length}</strong>명의 임직원
+        </div>
+      </div>
+
       {showForm && (
-        <div className="glass-card animate-scale" style={{ border: '1px solid var(--primary-border)' }}>
+        <div className="glass-card animate-scale" style={{ border: '1.5px solid var(--primary-border)' }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>{editId ? '직원 기본 정보 수정' : '신규 직원 등록'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
@@ -1582,18 +1631,24 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
         <table className="custom-table">
           <thead>
             <tr>
-              <th>이름</th>
+              <th onClick={() => setSortBy(sortBy === 'name_asc' ? 'default' : 'name_asc')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                이름 {sortBy === 'name_asc' ? '▲' : ''}
+              </th>
               <th>부서</th>
               <th>연락처</th>
               <th>이메일</th>
-              <th>입사일</th>
+              <th onClick={() => setSortBy(sortBy === 'join_asc' ? 'join_desc' : 'join_asc')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                입사일 {sortBy === 'join_asc' ? '▲' : sortBy === 'join_desc' ? '▼' : ''}
+              </th>
               <th>상태</th>
-              <th>잔여연차 (현재주기)</th>
+              <th onClick={() => setSortBy(sortBy === 'rem_asc' ? 'rem_desc' : 'rem_asc')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                잔여연차 (현재주기) {sortBy === 'rem_asc' ? '▲' : sortBy === 'rem_desc' ? '▼' : ''}
+              </th>
               <th style={{ textAlign: 'right' }}>작업</th>
             </tr>
           </thead>
           <tbody>
-            {myEmps.map(emp => {
+            {sortedEmps.map(emp => {
               const balance = getCurrentLeaveBalance(emp.join_date, leaves.filter(l => l.emp_id === emp.id), company?.basis_type, company?.basis_date, new Date(), company?.leave_disposal ?? 'expire');
               const total = balance.granted;
               const remaining = balance.remaining;
