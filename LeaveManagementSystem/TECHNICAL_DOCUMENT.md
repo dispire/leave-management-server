@@ -59,6 +59,7 @@ graph TD
 | **20** | 반차/오후반차 0.5일 변환 지원 및 소멸 예정 연차 보존 기능 구축 | **완료** | [leaveCalc.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/utils/leaveCalc.ts#L105-L115), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L25-L38) | ① `BASE_LEAVE_TYPES`에 `오전반차(am_half)`, `오후반차(pm_half)` 공식 등록 및 `leaveCalc.ts` 0.5일 자동 연차 차감 산출 연동. ② `EditLeaveModal` 내 단일일자 변경 시 0.5일 유지 보정 및 `[1일]`, `[0.5일(반차)]`, `[0.25일]` 퀵 셋 버튼 제공. ③ `HistoryModal` 내 소멸 예정 연차 활용 팁 카드 및 **[+ 소멸 연차 보존 (1일 선사용 등록)]** 원클릭 지원 |
 | **21** | 총 부여일수 원본 보존 및 전주기 부채 차감 시각화 보정 | **완료** | [leaveCalc.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/utils/leaveCalc.ts#L275-L295), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1830-L1845) | `leaveCalc.ts` 2차 정산(Pass 2)에서 전주기 초과 사용 부채 차감 시 `grantedDays`를 직접 감산하던 오동작 수정 → 법정 총 부여일수(`15.0일`) 원본 보존 및 `debtDays` 분리 연산 적용 (UI에 `전주기부채 -X일` 명시) |
 | **22** | 임직원 목록 정렬 기능 (DB순/입사일/잔여연차/이름) 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1432-L1600) | 직원 관리 탭 상단 정렬 드롭다운 바 및 테이블 헤더 클릭 정렬(클릭 시 ▲/▼ 변경) 탑재: 기본순(DB등록순), 입사일(오름차순/내림차순), 잔여연차(적은순/많은순), 이름(가나다순) |
+| **23** | 기간 연차 신청 시 일자 범위 자동 연산 및 1회 신청 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L775-L920) | `ApplyLeave` 탭에서 시작일≠종료일 다중일자 선택 시 `daysInRange(startDate, endDate)` 자동 연산(예: 8월11일~12일 ➔ 2일 자동 산출) 및 요약 뱃지 표시 → 여러 번 나누어 신청할 필요 없이 1회 신청으로 전체 기간 자동 차감 |
 
 ---
 

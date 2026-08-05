@@ -773,17 +773,23 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
     return Math.max(0, gt.days - used);
   };
 
+  const calculatedDays = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    if (startDate === endDate) return parseFloat(unit) || 1;
+    return daysInRange(startDate, endDate);
+  }, [startDate, endDate, unit]);
+
   const submit = async () => {
     if (!startDate || !endDate) return alert('시작일과 종료일을 선택해주세요.');
     let u: number;
-    if (isExempt || isFamily) {
+    if (isExempt || isFamily || startDate !== endDate) {
       u = daysInRange(startDate, endDate);
     } else {
       u = parseFloat(unit);
     }
 
     let isExceeded = false;
-    if (type === 'annual' && u > remaining) {
+    if ((type === 'annual' || type === 'unearned_annual') && u > remaining) {
       const confirmProceed = confirm(
         `잔여 연차가 부족합니다. (현재 잔여 연차: ${remaining.toFixed(2)}일, 신청일수: ${u.toFixed(2)}일)\n\n` +
         `보유 연차 한도를 초과하는 ${(u - remaining).toFixed(2)}일분은 무급 휴가로 차감되거나 차기 연차에서 땡겨 쓰기(차용) 처리됩니다.\n` +
@@ -844,12 +850,20 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
           <label className="input-label">휴가 종류</label>
           <select 
             value={type} 
-            onChange={e => { setType(e.target.value); setUnit('1'); }} 
+            onChange={e => { 
+              const newType = e.target.value;
+              setType(newType); 
+              if (newType === 'am_half' || newType === 'pm_half') {
+                setUnit('0.5');
+              } else {
+                setUnit('1');
+              }
+            }} 
             className="input-field"
           >
             <option value="annual">연차 (일할 차감)</option>
             {annualTypes.filter(t => t.id !== 'annual').map(t => (
-              <option key={t.id} value={t.id}>{t.label} (차감 없음)</option>
+              <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '차감 없음' : '연차 차감'})</option>
             ))}
             {generalTypes.length > 0 && <option disabled>— 회사 일반휴가 —</option>}
             {generalTypes.map(t => (
@@ -862,9 +876,9 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
           </select>
         </div>
 
-        {!isExempt && !isFamily && (
+        {!isExempt && !isFamily && (startDate === endDate || !startDate || !endDate) && (
           <div className="input-group">
-            <label className="input-label">사용 단위</label>
+            <label className="input-label">사용 단위 (단일 일자 신청 시)</label>
             <select 
               value={unit} 
               onChange={e => setUnit(e.target.value)} 
@@ -909,6 +923,17 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
             />
           </div>
         </div>
+
+        {startDate && endDate && (
+          <div style={{ background: 'var(--primary-light)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--primary-border)50', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-800)' }}>
+              신청 기간: {startDate} {startDate !== endDate ? `~ ${endDate}` : ''}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>
+              총 {calculatedDays}일 신청
+            </span>
+          </div>
+        )}
 
         <div className="input-group">
           <label className="input-label">사유</label>
