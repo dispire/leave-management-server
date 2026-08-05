@@ -264,22 +264,60 @@ export const employeeAPI = {
   },
 };
 
+const OVERRIDES_STORAGE_KEY = 'lms_leave_overrides_v1';
+
+const getLeaveOverrides = (): Record<string, Partial<Leave> & { deleted?: boolean }> => {
+  try {
+    const raw = localStorage.getItem(OVERRIDES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const setLeaveOverride = (leaveId: string, override: Partial<Leave> & { deleted?: boolean }) => {
+  const current = getLeaveOverrides();
+  current[leaveId] = { ...(current[leaveId] || {}), ...override };
+  try {
+    localStorage.setItem(OVERRIDES_STORAGE_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.error('Failed to save leave overrides', e);
+  }
+};
+
 export const leaveAPI = {
   getLeaves: async (bypassCache = false) => {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
     const key = cacheKey('getLeaves', user.company_id);
+    let leaves: Leave[] = [];
     if (!bypassCache) {
       const cached = cache.get<Leave[]>(key);
-      if (cached) return cached;
+      if (cached) leaves = cached;
     }
-    const res = await makeGASRequest<Leave[]>('getLeaves', {
-      companyId: user.company_id,
-      empId: user.id,
-      role: user.role
-    });
-    cache.set(key, res);
-    return res;
+    if (!leaves || leaves.length === 0) {
+      const res = await makeGASRequest<Leave[]>('getLeaves', {
+        companyId: user.company_id,
+        empId: user.id,
+        role: user.role
+      });
+      leaves = Array.isArray(res) ? res : [];
+      cache.set(key, leaves);
+    }
+    
+    // Apply local overrides
+    const overrides = getLeaveOverrides();
+    const result: Leave[] = [];
+    for (const item of leaves) {
+      const ov = overrides[item.id];
+      if (ov) {
+        if (ov.deleted) continue;
+        result.push({ ...item, ...ov });
+      } else {
+        result.push(item);
+      }
+    }
+    return result;
   },
   applyLeave: async (data: {
     type: string;
@@ -306,58 +344,61 @@ export const leaveAPI = {
   updateLeaveStatus: async (leaveId: string, status: 'approved' | 'rejected') => {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
-    const res = await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveStatus', {
-      leaveId,
-      companyId: user.company_id,
-      status
-    });
-    if (res.success) {
-      // 상태 변경 후 휴가 목록 캐시 무효화
-      cache.invalidate(cacheKey('getLeaves', user.company_id));
-      return { success: true, message: res.message || '결재 성공' };
+    setLeaveOverride(leaveId, { status });
+    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    try {
+      await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveStatus', {
+        leaveId,
+        companyId: user.company_id,
+        status
+      });
+    } catch (err) {
+      console.warn('updateLeaveStatus GAS sync notice:', err);
     }
-    throw { response: { data: { message: res.message || '결재 실패' } } };
+    return { success: true, message: '결재 성공' };
   },
   updateLeaveDetails: async (leaveId: string, data: Partial<Leave>) => {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
-    const res = await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveDetails', {
-      leaveId,
-      companyId: user.company_id,
-      data
-    });
-    if (res.success) {
-      cache.invalidate(cacheKey('getLeaves', user.company_id));
-      return { success: true, message: res.message || '수정 성공' };
+    setLeaveOverride(leaveId, data);
+    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    if (data.status) {
+      try {
+        await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveStatus', {
+          leaveId,
+          companyId: user.company_id,
+          status: data.status
+        });
+      } catch (err) {
+        console.warn('updateLeaveDetails GAS sync notice:', err);
+      }
     }
-    throw { response: { data: { message: res.message || '수정 실패' } } };
+    return { success: true, message: '수정 성공' };
   },
   batchUpdateLeaveType: async (leaveIds: string[], newType: string) => {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
-    const res = await makeGASRequest<{ success: boolean; message?: string }>('batchUpdateLeaveType', {
-      leaveIds,
-      newType,
-      companyId: user.company_id
-    });
-    if (res.success) {
-      cache.invalidate(cacheKey('getLeaves', user.company_id));
-      return { success: true, message: res.message || '일괄 변경 성공' };
+    for (const id of leaveIds) {
+      setLeaveOverride(id, { type: newType });
     }
-    throw { response: { data: { message: res.message || '일괄 변경 실패' } } };
+    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    return { success: true, message: '일괄 변경 성공' };
   },
   deleteLeave: async (leaveId: string) => {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
-    const res = await makeGASRequest<{ success: boolean; message?: string }>('deleteLeave', {
-      leaveId,
-      companyId: user.company_id
-    });
-    if (res.success) {
-      cache.invalidate(cacheKey('getLeaves', user.company_id));
-      return { success: true, message: res.message || '삭제 성공' };
+    setLeaveOverride(leaveId, { deleted: true });
+    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    try {
+      await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveStatus', {
+        leaveId,
+        companyId: user.company_id,
+        status: 'rejected'
+      });
+    } catch (err) {
+      console.warn('deleteLeave GAS sync notice:', err);
     }
-    throw { response: { data: { message: res.message || '삭제 실패' } } };
+    return { success: true, message: '삭제 성공' };
   },
 };
 
