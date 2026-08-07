@@ -1802,44 +1802,54 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
       </div>
 
       {showForm && (
-        <div className="glass-card animate-scale" style={{ border: '1.5px solid var(--primary-border)' }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>{editId ? '직원 기본 정보 수정' : '신규 직원 등록'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">이름 *</label>
-              <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" />
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-card animate-scale" style={{ background: '#fff', maxWidth: 560, width: '100%', padding: '1.75rem', borderRadius: 14, border: '1.5px solid var(--primary-border)', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>{editId ? '직원 기본 정보 수정' : '신규 직원 등록'}</h3>
+              <button className="btn btn-ghost" onClick={() => setShowForm(false)} style={{ padding: 4, fontSize: 18, width: 32, height: 32 }}>✕</button>
             </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">이메일 *</label>
-              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-field" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">이름 *</label>
+                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">이메일 *</label>
+                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-field" />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">연락처</label>
+                <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))} className="input-field" placeholder="010-0000-0000" />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">입사일 *</label>
+                <input type="date" value={form.joinDate} onChange={e => setForm(f => ({ ...f, joinDate: e.target.value }))} className="input-field" />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">부서</label>
+                <input type="text" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} className="input-field" placeholder="부서명 입력" />
+              </div>
             </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">연락처</label>
-              <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))} className="input-field" placeholder="010-0000-0000" />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setShowForm(false)}>취소</button>
+              <button className="btn btn-primary" onClick={save}>저장</button>
             </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">입사일 *</label>
-              <input type="date" value={form.joinDate} onChange={e => setForm(f => ({ ...f, joinDate: e.target.value }))} className="input-field" />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">부서</label>
-              <input type="text" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} className="input-field" placeholder="부서명 입력" />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={save}>저장</button>
-            <button className="btn" onClick={() => setShowForm(false)}>취소</button>
           </div>
         </div>
       )}
 
       {loaModal && (
-        <div className="glass-card animate-scale" style={{ border: '1.5px solid var(--warning)', background: '#FFFDF9' }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ShieldAlert size={16} style={{ color: 'var(--warning)' }} />
-            {loaModal.name} 임직원 휴직 설정
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-card animate-scale" style={{ background: '#FFFDF9', maxWidth: 480, width: '100%', padding: '1.75rem', borderRadius: 14, border: '1.5px solid var(--warning)', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--warning-border)40', paddingBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--gray-900)' }}>
+                <ShieldAlert size={16} style={{ color: 'var(--warning)' }} />
+                {loaModal.name} 임직원 휴직 설정
+              </div>
+              <button className="btn btn-ghost" onClick={() => setLoaModal(null)} style={{ padding: 4, fontSize: 18, width: 32, height: 32 }}>✕</button>
+            </div>
+            <LOAForm emp={loaModal} onSave={setLOA} onCancel={() => setLoaModal(null)} />
           </div>
-          <LOAForm emp={loaModal} onSave={setLOA} onCancel={() => setLoaModal(null)} />
         </div>
       )}
 
