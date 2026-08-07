@@ -120,13 +120,13 @@ export function calculateLeaveCycles(
     // === DATE OF HIRE BASIS ===
     const diffYears = getDaysDiff(join, today) / 365.25;
 
-    // 1. Year 1 monthly leaves: Up to 11 days (expires on 1st anniversary)
+    // 1. Year 1 pre-granted leaves: 11 days upfront (expires on 1st anniversary)
+    // 선부여 방식: 입사 당일부터 11일 전체 부여 (근로기준법 §60④ 실무 표준)
     const y1End = new Date(join);
     y1End.setFullYear(join.getFullYear() + 1);
     y1End.setDate(y1End.getDate() - 1);
 
-    const completedMonthsInY1 = getCompletedMonths(join, today < y1End ? today : y1End);
-    const y1MonthlyGranted = Math.min(completedMonthsInY1, 11);
+    const y1MonthlyGranted = 11;
 
     const y1StartStr = formatLocalDate(join);
     const y1EndStr = formatLocalDate(y1End);
@@ -135,7 +135,7 @@ export function calculateLeaveCycles(
       .reduce((sum, l) => sum + l.unit, 0);
 
     cycles.push({
-      label: '1년 미만 매월 발생 연차',
+      label: '1년 미만 선부여 연차 (최대 11일)',
       startDate: y1StartStr,
       endDate: y1EndStr,
       grantedDays: y1MonthlyGranted,
@@ -193,16 +193,15 @@ export function calculateLeaveCycles(
     const initialStartStr = formatLocalDate(join);
     const initialEndStr = formatLocalDate(initialEnd);
 
-    // Generation: 1 day per month in first year, up to 11 days
-    const completedMonthsInitial = getCompletedMonths(join, today < initialEnd ? today : initialEnd);
-    const initialGranted = Math.min(completedMonthsInitial, 11);
+    // 선부여 방식: 입사 당일부터 11일 전체 부여 (근로기준법 §60④ 실무 표준)
+    const initialGranted = 11;
 
     const initialUsed = approvedAnnualLeaves
       .filter((l) => l.start_date >= initialStartStr && l.start_date <= initialEndStr)
       .reduce((sum, l) => sum + l.unit, 0);
 
     cycles.push({
-      label: '1년 미만 매월 발생 연차',
+      label: '1년 미만 선부여 연차 (최대 11일)',
       startDate: initialStartStr,
       endDate: initialEndStr,
       grantedDays: initialGranted,
