@@ -82,6 +82,7 @@ graph TD
 | **26** | 반차 사용단위 0.5일 고정 및 대시보드 승인 이력/캘린더 렌더링 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L470-L720), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L880-L900) | ① `ApplyLeave` 탭에서 오전반차/오후반차 선택 시 `0.5일 (반차 고정)` 필드로 비활성 고정. ② Dashboard 내 `leavesByDay` 타임존 날짜 누락 보정 및 `최근 승인된 연차/반차 이력` 위젯 신설 |
 | **27** | 대시보드 회사휴가/경조휴가 및 관리자/직원 전체 승인 휴가 표시 누락 수정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L426-L760) | ① `myCompanyEmps` 내 `role !== 'admin'` 필터 제거 ➔ 이광희 등 관리자 계정 승인 휴가 대시보드 누락 수정. ② 일반 직원 계정 캘린더 `allLeaves` 범위 확대 ➔ 회사휴가/경조휴가/동료 승인 휴가 캘린더 정상 표출. ③ 캘린더 범주 라벨 및 색상(Emerald/Amber/Indigo) 매칭 보정 |
 | **28** | 신규 직원 회원가입 관리자 승인제 구축 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L88-L100), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L226-L260), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1650-L1850) | ① 기존 회사 선택 회원가입 시 계정 상태 `pending(가입 승인 대기)`으로 세팅. ② 승인 대기 계정 로그인 시 차단 및 안내 문구 표출. ③ 대시보드 및 직원 관리 탭 내 **[가입 승인 대기 목록]** 신설 및 관리자 **[승인] / [거절]** 원클릭 지원 |
+| **29** | 1년 미만 연차 발생 방식 점진적 발생 → 선부여 방식 전환 | **완료** | [leaveCalc.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/utils/leaveCalc.ts#L123-L145) | 기존 매월 만근 시 1일씩 순차 발생(`Math.min(경과월수, 11)`) 방식을 **입사 당일 11일 전체 선부여** 방식으로 변경. 입사일 기준(join) 및 회계연도 기준(fiscal/custom) 모두 적용. 주기 라벨도 `'1년 미만 선부여 연차 (최대 11일)'`로 업데이트. 마이너스 잔여 연차 발생 원천 방지 (근로기준법 §60④ 실무 표준 적용) |
 
 ---
 
