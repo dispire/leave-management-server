@@ -147,6 +147,20 @@ export default function App() {
     return [...filteredBase, ...gen, ...fam];
   }, [company]);
 
+  // 관리자 전용: 회사설정에서 비활성화된 타입 포함 전체 휴가 타입 목록
+  // 기존 내역 표시 및 관리자 수정 드롭다운에 사용 (설정 변경 후에도 과거 내역 정상 표시)
+  const allLeaveTypes = useMemo(() => {
+    if (!company) return BASE_LEAVE_TYPES.map(b => ({ ...b, isHidden: false }));
+    const hiddenIds = company.hidden_base_types || [];
+    const allBase = BASE_LEAVE_TYPES.map(b => {
+      const customLabel = (company.base_type_labels && company.base_type_labels[b.id]) || b.label;
+      return { ...b, label: customLabel, isHidden: hiddenIds.includes(b.id) };
+    });
+    const gen = (company.general_types || []).map(g => ({ id: g.id, label: g.label, color: '#059669', bg: '#ECFDF5', exempt: false, custom: 'general', isHidden: false }));
+    const fam = (company.family_types || []).map(f => ({ id: f.id, label: f.label, color: '#B45309', bg: '#FFFBEB', exempt: true, custom: 'family', isHidden: false }));
+    return [...allBase, ...gen, ...fam];
+  }, [company]);
+
   // bypassCache=false: 캐시 우선 사용 (0ms 렌더링), showSpinner=false: 백그라운드 갱신
   const loadAppData = async (bypassCache = false, showSpinner = false) => {
     if (showSpinner) setDataLoading(true);
@@ -336,8 +350,8 @@ export default function App() {
           <>
             {tab === 'dashboard' && <Dashboard currentUser={currentUser!} employees={employees} leaves={leaves} company={company!} leaveTypes={leaveTypes} isAdmin={isAdmin} />}
             {tab === 'apply' && <ApplyLeave currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} onApply={loadAppData} />}
-            {tab === 'history' && <LeaveHistory currentUser={currentUser!} leaves={leaves} employees={employees} leaveTypes={leaveTypes} isAdmin={isAdmin} onApprove={loadAppData} />}
-            {tab === 'employees' && isAdmin && <EmployeeMgmt employees={employees} currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} onUpdate={loadAppData} />}
+            {tab === 'history' && <LeaveHistory currentUser={currentUser!} leaves={leaves} employees={employees} leaveTypes={leaveTypes} allLeaveTypes={allLeaveTypes} isAdmin={isAdmin} onApprove={loadAppData} />}
+            {tab === 'employees' && isAdmin && <EmployeeMgmt employees={employees} currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} allLeaveTypes={allLeaveTypes} onUpdate={loadAppData} />}
             {tab === 'settings' && isAdmin && <CompanySettings company={company!} employees={employees} currentUser={currentUser!} onSave={loadAppData} />}
           </>
         )}
@@ -1074,11 +1088,12 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
 }
 
 // ---------- Leave History / Approval ----------
-function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onApprove }: {
+function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveTypes, isAdmin, onApprove }: {
   currentUser: Employee;
   leaves: Leave[];
   employees: Employee[];
   leaveTypes: any[];
+  allLeaveTypes: any[];
   isAdmin: boolean;
   onApprove: () => void;
 }) {
@@ -1334,7 +1349,8 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
               </tr>
             ) : (
               paginatedData.map(l => {
-                const lt = leaveTypes.find(x => x.id === l.type);
+                // 활성 타입 우선 조회, 없으면 비활성 포함 전체 목록에서 fallback 조회 (설정 변경 후에도 기존 내역 정상 표시)
+                const lt = leaveTypes.find(x => x.id === l.type) || allLeaveTypes.find(x => x.id === l.type);
                 const stat = statusMap[l.status] || { label: l.status, color: 'var(--gray-500)', bg: 'var(--gray-100)' };
                 
                 return (
@@ -1342,7 +1358,10 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ width: 10, height: 10, borderRadius: '50%', background: lt?.color || 'var(--primary)' }} />
-                        <span style={{ fontWeight: 600 }}>{lt?.label || l.type}</span>
+                        <span style={{ fontWeight: 600 }}>
+                          {lt?.label || l.type}
+                          {lt?.isHidden && <span style={{ fontSize: 10, color: 'var(--gray-400)', marginLeft: 4, fontWeight: 400 }}>(비활성)</span>}
+                        </span>
                       </div>
                     </td>
                     {isAdmin && <td style={{ fontWeight: 600 }}>{l.emp_name} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--gray-500)' }}>({l.emp_dept})</span></td>}
@@ -1352,7 +1371,8 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
                         : `${formatDateStr(l.start_date)} ~ ${formatDateStr(l.end_date)}`}
                     </td>
                     <td style={{ fontWeight: 600 }}>
-                      {lt?.exempt ? `${daysInRange(l.start_date, l.end_date)}일 (제외)` : `${l.unit}일`}
+                      {/* exempt 타입이어도 l.unit 우선 표시 (반차 0.5일 → 무급연차 변환 시 1일로 잘못 계산되던 버그 수정) */}
+                      {lt?.exempt ? `${l.unit > 0 ? l.unit : daysInRange(l.start_date, l.end_date)}일 (제외)` : `${l.unit}일`}
                     </td>
                     <td style={{ color: 'var(--gray-500)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {l.reason || '-'}
@@ -1401,6 +1421,7 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
         <EditLeaveModal
           leave={editingLeave}
           leaveTypes={leaveTypes}
+          allLeaveTypes={allLeaveTypes}
           onClose={() => setEditingLeave(null)}
           onSave={onApprove}
         />
@@ -1454,9 +1475,10 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, isAdmin, onA
 
 
 // ---------- Edit Leave Modal ----------
-function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
+function EditLeaveModal({ leave, leaveTypes, allLeaveTypes, onClose, onSave }: {
   leave: Leave;
   leaveTypes: any[];
+  allLeaveTypes?: any[]; // 관리자용: 비활성 타입 포함 전체 목록 (설정에서 제거되더라도 수정 가능)
   onClose: () => void;
   onSave: () => void;
 }) {
@@ -1468,9 +1490,12 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
   const [endDate, setEndDate] = useState(() => formatDateStr(leave.end_date));
   const [saving, setSaving] = useState(false);
 
+  // 관리자는 allLeaveTypes(비활성 포함 전체) 사용, 일반은 활성 leaveTypes만 사용
+  const effectiveLeaveTypes = allLeaveTypes || leaveTypes;
+
   const handleTypeChange = (newType: string) => {
     setType(newType);
-    const targetObj = leaveTypes.find(t => t.id === newType);
+    const targetObj = effectiveLeaveTypes.find(t => t.id === newType);
     if (targetObj?.defaultUnit) {
       setUnit(targetObj.defaultUnit);
     } else if (newType === 'am_half' || newType === 'pm_half') {
@@ -1525,8 +1550,10 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">휴가 종류 (구분)</label>
             <select value={type} onChange={e => handleTypeChange(e.target.value)} className="input-field">
-              {leaveTypes.map(t => (
-                <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '연차차감제외' : '연차차감'})</option>
+              {effectiveLeaveTypes.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.label}{t.isHidden ? ' (비활성)' : ''} ({t.exempt ? '연차차감제외' : '연차차감'})
+                </option>
               ))}
             </select>
           </div>
@@ -1578,12 +1605,13 @@ function EditLeaveModal({ leave, leaveTypes, onClose, onSave }: {
 }
 
 // ---------- Employee Management ----------
-function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onUpdate }: {
+function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, allLeaveTypes, onUpdate }: {
   employees: Employee[];
   currentUser: Employee;
   leaves: Leave[];
   company: Company;
   leaveTypes: any[];
+  allLeaveTypes: any[];
   onUpdate: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -1859,6 +1887,7 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
           leaves={leaves} 
           company={company} 
           leaveTypes={leaveTypes}
+          allLeaveTypes={allLeaveTypes}
           onClose={() => setSelectedHistoryEmp(null)} 
           onRefresh={onUpdate}
         />
@@ -1956,11 +1985,12 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, onU
 }
 
 // ---------- History Modal ----------
-function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: {
+function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose, onRefresh }: {
   emp: Employee;
   leaves: Leave[];
   company: Company;
   leaveTypes: any[];
+  allLeaveTypes: any[]; // 관리자용 전체 타입 (비활성 포함)
   onClose: () => void;
   onRefresh: () => void;
 }) {
@@ -1989,10 +2019,11 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
 
   const handleBatchTypeChange = async () => {
     if (selectedIds.length === 0) return alert('일괄 변경할 휴가 항목을 1개 이상 선택해 주세요.');
-    const targetTypeObj = leaveTypes.find(t => t.id === batchType);
+    // 관리자는 allLeaveTypes에서 레이블 조회 (비활성 타입도 변경 가능)
+    const targetTypeObj = allLeaveTypes.find(t => t.id === batchType);
     const targetLabel = targetTypeObj ? targetTypeObj.label : batchType;
 
-    if (!confirm(`선택한 ${selectedIds.length}건의 휴가 구분을 '${targetLabel}'(으)로 일괄 변경하시겠습니까?\n변경 시 연차 차감 일수가 재산출됩니다.`)) return;
+    if (!confirm(`선택한 ${selectedIds.length}건의 휴가 구분을 '${targetLabel}'(으)로 일괄 변경하시겠습니까?\n변경 시 연차 차감 일수가 재산수됩니다.`)) return;
 
     setIsUpdating(true);
     try {
@@ -2191,8 +2222,11 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
                     className="input-field" 
                     style={{ padding: '4px 8px', fontSize: 12, width: 'auto', margin: 0 }}
                   >
-                    {leaveTypes.map(t => (
-                      <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '차감제외' : '연차차감'})</option>
+                    {/* 관리자는 비활성 포함 전체 타입으로 변경 가능 */}
+                    {allLeaveTypes.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}{t.isHidden ? ' (비활성)' : ''} ({t.exempt ? '차감제외' : '연차차감'})
+                      </option>
                     ))}
                   </select>
                   <button 
@@ -2228,7 +2262,8 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
                   <tbody>
                     {empLeaves.map(l => {
                       const isChecked = selectedIds.includes(l.id);
-                      const typeObj = leaveTypes.find(t => t.id === l.type);
+                      // 활성 타입 우선, 없으면 allLeaveTypes에서 fallback (비활성 타입도 일괄변경 목록에 표시)
+                      const typeObj = leaveTypes.find(t => t.id === l.type) || allLeaveTypes.find(t => t.id === l.type);
                       const typeLabel = typeObj ? typeObj.label : l.type;
                       const isExempt = typeObj ? typeObj.exempt : false;
                       
@@ -2255,7 +2290,7 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
                               color: isExempt ? '#4B5563' : '#4F46E5', 
                               border: `1px solid ${isExempt ? '#E5E7EB' : '#C7D2FE'}` 
                             }}>
-                              {typeLabel} {isExempt ? '(차감제외)' : ''}
+                              {typeLabel}{typeObj?.isHidden ? ' (비활성)' : ''} {isExempt ? '(차감제외)' : ''}
                             </span>
                           </td>
                           <td style={{ fontWeight: 600 }}>{fmtUnit(l.unit)}</td>
@@ -2289,6 +2324,7 @@ function HistoryModal({ emp, leaves, company, leaveTypes, onClose, onRefresh }: 
           <EditLeaveModal
             leave={editingLeave}
             leaveTypes={leaveTypes}
+            allLeaveTypes={allLeaveTypes}
             onClose={() => setEditingLeave(null)}
             onSave={() => {
               setEditingLeave(null);
