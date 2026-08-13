@@ -400,6 +400,57 @@ export const leaveAPI = {
     }
     return { success: true, message: '삭제 성공' };
   },
+  applyBulkLeaves: async (items: Array<{
+    empId: string;
+    type: string;
+    unit: number;
+    startDate: string;
+    endDate: string;
+    reason: string;
+    status?: 'approved' | 'pending' | 'rejected';
+  }>) => {
+    const user = getSessionUser();
+    if (!user) throw new Error('Unauthorized');
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Execute in parallel batches of 5 to avoid GAS rate limits
+    const batchSize = 5;
+    for (let i = 0; i < items.length; i += batchSize) {
+      const chunk = items.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        chunk.map(async (item) => {
+          const res = await makeGASRequest<{ success: boolean; leaveId?: string; message?: string }>('applyLeave', {
+            empId: item.empId,
+            data: {
+              type: item.type,
+              unit: item.unit,
+              startDate: item.startDate,
+              endDate: item.endDate,
+              reason: item.reason
+            }
+          });
+          if (res.success && item.status && item.status !== 'pending' && res.leaveId) {
+            await makeGASRequest('updateLeaveStatus', {
+              leaveId: res.leaveId,
+              companyId: user.company_id,
+              status: item.status
+            }).catch(() => {});
+          }
+          return res;
+        })
+      );
+
+      results.forEach(r => {
+        if (r.status === 'fulfilled') successCount++;
+        else failCount++;
+      });
+    }
+
+    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    return { successCount, failCount, total: items.length };
+  },
 };
 
 const api = axios.create({

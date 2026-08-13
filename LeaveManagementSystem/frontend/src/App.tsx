@@ -1190,6 +1190,8 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
             : leaves.filter(l => l.emp_id === currentUser.id),
   [leaves, isAdmin, employees, currentUser]);
 
+  const pendingCount = myLeaves.filter(l => l.status === 'pending').length;
+
   const filtered = useMemo(() => {
     let list = [...myLeaves];
     if (isAdmin && searchEmpName.trim()) {
@@ -1230,9 +1232,9 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
     rejected: { label: '반려됨', color: 'var(--danger)', bg: 'var(--danger-light)' },
   };
 
-  const pendingCount = myLeaves.filter(l => l.status === 'pending').length;
   const [bulkApproving, setBulkApproving] = useState(false);
   const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const handleBulkApprove = async () => {
     const pendingsOnPage = paginatedData.filter(l => l.status === 'pending');
@@ -1312,16 +1314,27 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
             {isAdmin ? '소속 임직원들의 휴가 신청을 검토하고 승인하거나 반려합니다.' : '신청하신 휴가의 결재 상태를 조회하며, 직접 신청을 취소할 수 있습니다.'}
           </p>
         </div>
-        {isAdmin && pendingCount > 0 && (
+        {isAdmin && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <StatusBadge label={`승인 대기 ${pendingCount}건`} color="var(--warning)" bg="var(--warning-light)" />
+            {pendingCount > 0 && (
+              <>
+                <StatusBadge label={`승인 대기 ${pendingCount}건`} color="var(--warning)" bg="var(--warning-light)" />
+                <button 
+                  className="btn btn-primary" 
+                  onClick={handleBulkApprove} 
+                  disabled={bulkApproving}
+                  style={{ padding: '6px 12px', fontSize: 12 }}
+                >
+                  {bulkApproving ? '승인 중...' : '현재 페이지 일괄 승인'}
+                </button>
+              </>
+            )}
             <button 
-              className="btn btn-primary" 
-              onClick={handleBulkApprove} 
-              disabled={bulkApproving}
-              style={{ padding: '6px 12px', fontSize: 12 }}
+              className="btn" 
+              onClick={() => setShowBulkImport(true)} 
+              style={{ padding: '6px 12px', fontSize: 12, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: 4 }}
             >
-              {bulkApproving ? '승인 중...' : '현재 페이지 일괄 승인'}
+              <FileText size={14} /> 엑셀/텍스트 일괄 등록
             </button>
           </div>
         )}
@@ -1522,6 +1535,16 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
           allLeaveTypes={allLeaveTypes}
           onClose={() => setEditingLeave(null)}
           onSave={onApprove}
+        />
+      )}
+
+      {showBulkImport && (
+        <BulkImportModal
+          employees={employees}
+          leaveTypes={leaveTypes}
+          allLeaveTypes={allLeaveTypes}
+          onClose={() => setShowBulkImport(false)}
+          onComplete={onApprove}
         />
       )}
 
@@ -1752,6 +1775,7 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
   }, [employees, currentUser, sortBy, leaves, company]);
 
   const [regActionLoadingId, setRegActionLoadingId] = useState<string | null>(null); // 가입 승인/거절 중복 클릭 방지
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const handleApproveRegistration = async (emp: Employee) => {
     if (regActionLoadingId) return; // 중복 클릭 방지
@@ -1883,9 +1907,14 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)' }}>임직원 관리</h2>
           <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>소속 직원의 기본 정보 수정, 가입 승인, 휴직 설정 및 퇴사 처리를 일괄 관리합니다.</p>
         </div>
-        <button className="btn btn-primary" onClick={startAdd} style={{ gap: 6 }}>
-          <UserPlus size={16} /> 직원 추가 등록
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={() => setShowBulkImport(true)} style={{ gap: 6, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>
+            <FileText size={16} /> 엑셀/텍스트 휴가 일괄 등록
+          </button>
+          <button className="btn btn-primary" onClick={startAdd} style={{ gap: 6 }}>
+            <UserPlus size={16} /> 직원 추가 등록
+          </button>
+        </div>
       </div>
 
       {pendingEmps.length > 0 && (
@@ -2116,6 +2145,16 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
           </tbody>
         </table>
       </div>
+
+      {showBulkImport && (
+        <BulkImportModal
+          employees={employees}
+          leaveTypes={leaveTypes}
+          allLeaveTypes={allLeaveTypes}
+          onClose={() => setShowBulkImport(false)}
+          onComplete={onUpdate}
+        />
+      )}
     </div>
   );
 }
@@ -2481,6 +2520,416 @@ function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose
           <button className="btn btn-primary" onClick={onClose} style={{ padding: '8px 20px' }}>
             확인
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Bulk Import Modal (Excel/CSV/Text Copy-Paste) ----------
+interface ParsedBulkItem {
+  id: string;
+  name: string;
+  matchedEmp: Employee | null;
+  dateStr: string;
+  unit: number;
+  typeRaw: string;
+  typeMapped: string;
+  typeLabel: string;
+  isExempt: boolean;
+  isValid: boolean;
+  errorMsg?: string;
+}
+
+function parseBulkText(text: string, emps: Employee[], types: any[]): ParsedBulkItem[] {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const result: ParsedBulkItem[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (i === 0 && (line.includes('이름') || line.includes('날짜') || line.includes('Name') || line.includes('Date'))) {
+      continue;
+    }
+
+    let tokens = line.split('\t');
+    if (tokens.length < 3) tokens = line.split(',');
+    if (tokens.length < 3) tokens = line.split('|');
+    if (tokens.length < 3) tokens = line.split(/\s+/);
+
+    if (tokens.length < 2) continue;
+
+    const name = tokens[0]?.trim() || '';
+    const dateRaw = tokens[1]?.trim() || '';
+    const unitRaw = tokens[2]?.trim() || '1';
+    const typeRaw = tokens[3]?.trim() || '연차';
+
+    let normalizedDate = dateRaw;
+    try {
+      const parsedD = parseLocalDate(dateRaw);
+      if (!isNaN(parsedD.getTime())) {
+        normalizedDate = formatLocalDate(parsedD);
+      }
+    } catch {
+      // keep raw
+    }
+
+    let unitVal = parseFloat(unitRaw);
+    if (isNaN(unitVal) || unitVal <= 0) {
+      if (typeRaw.includes('반차')) unitVal = 0.5;
+      else unitVal = 1.0;
+    }
+
+    let typeMapped = 'annual';
+    let typeLabel = '연차';
+    let isExempt = false;
+
+    const rawLower = typeRaw.toLowerCase();
+    if (rawLower.includes('무급')) {
+      typeMapped = 'unpaid_annual';
+      typeLabel = '무급연차 (차감제외)';
+      isExempt = true;
+    } else if (rawLower.includes('선지급') || rawLower.includes('차용') || rawLower.includes('선사용')) {
+      typeMapped = 'unearned_annual';
+      typeLabel = '연차 선사용(사전승인)';
+      isExempt = false;
+    } else if (rawLower.includes('오전') || rawLower === 'am_half') {
+      typeMapped = 'am_half';
+      typeLabel = '오전반차 (0.5일)';
+      unitVal = 0.5;
+      isExempt = false;
+    } else if (rawLower.includes('오후') || rawLower === 'pm_half') {
+      typeMapped = 'pm_half';
+      typeLabel = '오후반차 (0.5일)';
+      unitVal = 0.5;
+      isExempt = false;
+    } else {
+      const matchedCustom = types.find(t => t.label === typeRaw || t.id === typeRaw);
+      if (matchedCustom) {
+        typeMapped = matchedCustom.id;
+        typeLabel = matchedCustom.label;
+        isExempt = matchedCustom.exempt || false;
+      } else if (unitVal === 0.5) {
+        typeMapped = 'am_half';
+        typeLabel = '반차 (0.5일)';
+      } else {
+        typeMapped = 'annual';
+        typeLabel = '연차';
+      }
+    }
+
+    const matchedEmp = emps.find(e => e.name.trim() === name.trim() || e.id === name.trim()) || null;
+    let isValid = true;
+    let errorMsg = undefined;
+
+    if (!matchedEmp) {
+      isValid = false;
+      errorMsg = '등록되지 않은 사원명';
+    } else if (!normalizedDate || normalizedDate.length < 8) {
+      isValid = false;
+      errorMsg = '날짜 형식 오류';
+    }
+
+    result.push({
+      id: `bulk_${i}_${Math.random().toString(36).substr(2, 4)}`,
+      name,
+      matchedEmp,
+      dateStr: normalizedDate,
+      unit: unitVal,
+      typeRaw,
+      typeMapped,
+      typeLabel,
+      isExempt,
+      isValid,
+      errorMsg
+    });
+  }
+
+  return result;
+}
+
+function BulkImportModal({ employees, leaveTypes, allLeaveTypes, onClose, onComplete }: {
+  employees: Employee[];
+  leaveTypes: any[];
+  allLeaveTypes: any[];
+  onClose: () => void;
+  onComplete: () => void;
+}) {
+  const [rawText, setRawText] = useState('');
+  const [autoApprove, setAutoApprove] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const effectiveTypes = useMemo(() => allLeaveTypes || leaveTypes, [allLeaveTypes, leaveTypes]);
+
+  const parsedItems = useMemo(() => {
+    if (!rawText.trim()) return [];
+    return parseBulkText(rawText, employees, effectiveTypes);
+  }, [rawText, employees, effectiveTypes]);
+
+  const validItems = useMemo(() => parsedItems.filter(p => p.isValid), [parsedItems]);
+  const invalidItems = useMemo(() => parsedItems.filter(p => !p.isValid), [parsedItems]);
+
+  const totalAnnualDays = useMemo(() => 
+    validItems.filter(i => !i.isExempt).reduce((sum, i) => sum + i.unit, 0),
+  [validItems]);
+
+  const totalUnpaidDays = useMemo(() => 
+    validItems.filter(i => i.isExempt).reduce((sum, i) => sum + i.unit, 0),
+  [validItems]);
+
+  const loadParkSample = () => {
+    const sample = `박유진\t2024-09-19\t0.5\t연차
+박유진\t2024-09-23\t0.5\t연차
+박유진\t2024-10-21\t0.5\t연차
+박유진\t2024-11-14\t0.5\t연차
+박유진\t2024-11-18\t0.5\t연차
+박유진\t2024-11-20\t0.5\t연차
+박유진\t2024-11-21\t1.0\t연차
+박유진\t2024-11-27\t0.5\t연차
+박유진\t2025-01-04\t1.0\t연차
+박유진\t2025-02-27\t1.0\t연차
+박유진\t2025-02-28\t1.0\t연차
+박유진\t2025-01-08\t0.5\t연차
+박유진\t2025-01-24\t0.5\t연차
+박유진\t2025-03-19\t1.0\t연차
+박유진\t2025-03-29\t1.0\t연차
+박유진\t2025-05-13\t1.0\t연차
+박유진\t2025-05-19\t0.5\t연차
+박유진\t2025-05-22\t0.5\t연차
+박유진\t2025-05-29\t0.5\t연차
+박유진\t2025-06-18\t0.5\t연차
+박유진\t2025-07-19\t1.0\t연차
+박유진\t2025-07-22\t0.5\t연차
+박유진\t2025-07-29\t0.5\t연차
+박유진\t2025-08-18\t0.5\t연차
+박유진\t2025-08-23\t1.0\t연차
+박유진\t2025-08-26\t0.5\t연차
+박유진\t2025-08-30\t1.0\t연차
+박유진\t2025-09-08\t0.5\t연차
+박유진\t2025-09-10\t0.5\t연차
+박유진\t2025-09-12\t0.5\t연차
+박유진\t2025-09-16\t0.5\t연차
+박유진\t2025-10-10\t1.0\t연차
+박유진\t2025-10-11\t1.0\t연차
+박유진\t2025-09-26\t0.5\t연차
+박유진\t2025-10-20\t0.5\t연차
+박유진\t2025-10-24\t0.5\t연차
+박유진\t2025-10-27\t0.5\t연차
+박유진\t2025-10-30\t0.5\t연차
+박유진\t2025-11-24\t0.5\t연차
+박유진\t2026-02-26\t1.0\t연차
+박유진\t2026-02-27\t1.0\t연차
+박유진\t2026-03-03\t1.0\t연차
+박유진\t2026-01-30\t0.5\t연차
+박유진\t2026-02-06\t0.5\t연차
+박유진\t2026-03-04\t1.0\t무급
+박유진\t2026-03-05\t1.0\t무급
+박유진\t2026-03-06\t1.0\t무급
+박유진\t2026-04-15\t0.5\t무급
+박유진\t2026-04-20\t0.5\t무급
+박유진\t2026-04-21\t1.0\t무급
+박유진\t2026-04-22\t0.5\t무급
+박유진\t2026-05-04\t1.0\t무급
+박유진\t2026-04-30\t0.5\t무급
+박유진\t2026-05-09\t1.0\t무급
+박유진\t2026-05-18\t0.5\t무급
+박유진\t2026-05-20\t0.5\t무급
+박유진\t2026-05-29\t0.5\t연차
+박유진\t2026-06-10\t0.5\t무급
+박유진\t2026-06-18\t0.5\t무급
+박유진\t2026-06-22\t0.5\t무급
+박유진\t2026-06-26\t0.5\t무급
+박유진\t2026-07-18\t1.0\t무급
+박유진\t2026-08-18\t1.0\t연차
+박유진\t2026-08-19\t1.0\t연차
+박유진\t2026-07-13\t0.5\t무급
+박유진\t2026-07-22\t0.5\t무급
+박유진\t2026-08-03\t1.0\t연차`;
+    setRawText(sample);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      if (text) setRawText(text);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleExecuteImport = async () => {
+    if (validItems.length === 0) return alert('일괄 등록 가능한 유효 데이터가 없습니다.');
+    if (invalidItems.length > 0) {
+      if (!confirm(`유효하지 않은 ${invalidItems.length}건을 제외하고, 유효 데이터 ${validItems.length}건만 일괄 등록하시겠습니까?`)) return;
+    } else {
+      if (!confirm(`총 ${validItems.length}건의 휴가 데이터를 시스템에 일괄 등록하시겠습니까?\n\n- 연차: ${totalAnnualDays.toFixed(1)}일\n- 무급휴가: ${totalUnpaidDays.toFixed(1)}일`)) return;
+    }
+
+    setIsImporting(true);
+    try {
+      const itemsToSubmit = validItems.map(item => ({
+        empId: item.matchedEmp!.id,
+        type: item.typeMapped,
+        unit: item.unit,
+        startDate: item.dateStr,
+        endDate: item.dateStr,
+        reason: item.isExempt ? '일괄 등록 (무급연차)' : '일괄 등록 (연차)',
+        status: autoApprove ? ('approved' as const) : ('pending' as const)
+      }));
+
+      const res = await leaveAPI.applyBulkLeaves(itemsToSubmit);
+      alert(`🎉 일괄 등록 완료!\n\n총 ${res.total}건 중 ${res.successCount}건이 성공적으로 등록되었습니다.${res.failCount > 0 ? `\n(실패: ${res.failCount}건)` : ''}`);
+      onComplete();
+      onClose();
+    } catch (err: any) {
+      alert(err.response?.data?.message || '일괄 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div className="glass-card animate-scale" style={{ background: '#fff', maxWidth: 880, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '2rem', borderRadius: 16, border: '1px solid var(--gray-200)', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 12 }}>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-900)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FileText size={20} style={{ color: 'var(--primary)' }} />
+              스마트 엑셀/텍스트 휴가 일괄 등록 (Bulk Import)
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+              엑셀 표에서 <code>이름 | 날짜 | 일수 | 구분</code> 열을 그대로 복사하여 붙여넣거나 CSV/TXT 파일을 업로드하세요.
+            </p>
+          </div>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 20, padding: 4, width: 36, height: 36 }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label className="btn" style={{ padding: '6px 12px', fontSize: 12, cursor: 'pointer', background: '#f8fafc', borderColor: 'var(--gray-300)' }}>
+                📁 CSV/텍스트 파일 선택
+                <input type="file" accept=".csv,.txt,.tsv" onChange={handleFileUpload} style={{ display: 'none' }} />
+              </label>
+              <button className="btn" onClick={loadParkSample} style={{ padding: '6px 12px', fontSize: 12, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>
+                ✦ 박유진 사원 67건 샘플 텍스트 로드
+              </button>
+            </div>
+            {parsedItems.length > 0 && (
+              <button className="btn btn-ghost" onClick={() => setRawText('')} style={{ fontSize: 12, color: 'var(--gray-500)' }}>
+                초기화
+              </button>
+            )}
+          </div>
+
+          <textarea 
+            value={rawText}
+            onChange={e => setRawText(e.target.value)}
+            placeholder={`엑셀에서 복사한 데이터를 여기에 붙여넣으세요 (Ctrl+V)\n\n예시 형식:\n박유진\t2024-09-19\t0.5\t연차\n박유진\t2026-03-04\t1.0\t무급`}
+            rows={6}
+            className="input-field"
+            style={{ fontFamily: 'monospace', fontSize: 12, padding: 12, lineHeight: 1.5 }}
+          />
+
+          {parsedItems.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <div style={{ background: 'var(--primary-light)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--primary-border)50' }}>
+                  <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>총 파싱 건수</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-900)', marginTop: 2 }}>{parsedItems.length}건</div>
+                  <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>유효: {validItems.length}건 / 오류: {invalidItems.length}건</div>
+                </div>
+                <div style={{ background: '#EEF2FF', padding: '10px 14px', borderRadius: 8, border: '1px solid #C7D2FE' }}>
+                  <div style={{ fontSize: 11, color: '#4F46E5', fontWeight: 600 }}>연차 (선지급/차용 포함)</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#4338CA', marginTop: 2 }}>{totalAnnualDays.toFixed(1)}일</div>
+                  <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>한도 초과 시 차기 부채 차감</div>
+                </div>
+                <div style={{ background: '#F3F4F6', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB' }}>
+                  <div style={{ fontSize: 11, color: '#4B5563', fontWeight: 600 }}>무급 연차 (차감 제외)</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#1F2937', marginTop: 2 }}>{totalUnpaidDays.toFixed(1)}일</div>
+                  <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>연차 잔여일수 차감 안함</div>
+                </div>
+              </div>
+
+              {invalidItems.length > 0 && (
+                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '8px 12px', borderRadius: 8, fontSize: 11 }}>
+                  ⚠️ <strong>오류 검출:</strong> {invalidItems.length}건의 행이 등록되지 않은 사원명이거나 날짜 형식이 올바르지 않습니다. 소속 임직원 이름을 확인해 주세요.
+                </div>
+              )}
+
+              <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8 }}>
+                <table className="custom-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9' }}>
+                      <th style={{ width: 60, textAlign: 'center' }}>상태</th>
+                      <th>사원명</th>
+                      <th>날짜</th>
+                      <th>사용 일수</th>
+                      <th>분류된 휴가 종류</th>
+                      <th>원문 구분</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedItems.map((item, idx) => (
+                      <tr key={item.id} style={{ background: !item.isValid ? '#FEF2F2' : (idx % 2 === 1 ? '#f8fafc' : '#fff') }}>
+                        <td style={{ textAlign: 'center' }}>
+                          {item.isValid ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: 'var(--success-light)', color: 'var(--success)' }}>정상</span>
+                          ) : (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: 'var(--danger-light)', color: 'var(--danger)' }} title={item.errorMsg}>오류</span>
+                          )}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>
+                          {item.name} {item.matchedEmp ? <span style={{ fontSize: 10, color: 'var(--gray-500)', fontWeight: 400 }}>({item.matchedEmp.department || '부서'})</span> : <span style={{ fontSize: 10, color: 'var(--danger)' }}>(미등록)</span>}
+                        </td>
+                        <td>{item.dateStr}</td>
+                        <td style={{ fontWeight: 600 }}>{item.unit}일</td>
+                        <td>
+                          <span style={{
+                            fontSize: 11,
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            fontWeight: 600,
+                            background: item.isExempt ? '#F3F4F6' : '#EEF2FF',
+                            color: item.isExempt ? '#4B5563' : '#4F46E5',
+                            border: `1px solid ${item.isExempt ? '#E5E7EB' : '#C7D2FE'}`
+                          }}>
+                            {item.typeLabel}
+                          </span>
+                        </td>
+                        <td style={{ color: 'var(--gray-500)' }}>{item.typeRaw}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--gray-200)', paddingTop: 14, marginTop: 4 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+              <input 
+                type="checkbox" 
+                checked={autoApprove} 
+                onChange={e => setAutoApprove(e.target.checked)} 
+                style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 15, height: 15 }} 
+              />
+              등록 즉시 승인(approved) 상태로 처리 (과거 이력 일괄 등록 표준)
+            </label>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-ghost" onClick={onClose} disabled={isImporting}>취소</button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleExecuteImport} 
+                disabled={validItems.length === 0 || isImporting} 
+                style={{ padding: '8px 20px', fontWeight: 600 }}
+              >
+                {isImporting ? '등록 중...' : `유효 데이터 ${validItems.length}건 일괄 등록 적용`}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
