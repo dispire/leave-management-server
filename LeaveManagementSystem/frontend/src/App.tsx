@@ -123,6 +123,35 @@ function FormSkeleton() {
   );
 }
 
+function NotFoundScreen({ onGoHome }: { onGoHome: () => void }) {
+  return (
+    <div style={{ maxWidth: 520, margin: '3rem auto', textAlign: 'center' }} className="animate-scale">
+      <div className="glass-card" style={{ padding: '2.5rem 2rem', borderRadius: 20, boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#fff', fontSize: 28, fontWeight: 'bold', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3)' }}>✦</div>
+        <span style={{ display: 'inline-block', background: 'var(--primary-light)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, marginBottom: 12, border: '1px solid rgba(79,70,229,0.2)' }}>
+          오류 404
+        </span>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--gray-900)', marginBottom: 8 }}>
+          페이지를 찾을 수 없습니다
+        </h2>
+        <p style={{ fontSize: 14, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 24 }}>
+          요청하신 주소의 페이지가 존재하지 않거나,<br />접근 권한이 필요하여 차단되었을 수 있습니다.
+        </p>
+        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 12, border: '1px solid var(--gray-200)', textAlign: 'left', marginBottom: 20, fontSize: 12, color: 'var(--gray-600)' }}>
+          <div style={{ fontWeight: 600, color: 'var(--gray-800)', marginBottom: 6 }}>💡 다음 사항을 확인해 주세요</div>
+          <ul style={{ margin: '0 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <li>입력하신 URL 주소(URL Hash)가 올바른지 확인해 주세요.</li>
+            <li>관리자 전용 페이지의 경우 관리자 계정으로 로그인해야 접근 가능합니다.</li>
+          </ul>
+        </div>
+        <button className="btn btn-primary" onClick={onGoHome} style={{ width: '100%', height: 44, fontSize: 14, fontWeight: 600 }}>
+          🏠 대시보드로 돌아가기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
@@ -133,7 +162,55 @@ export default function App() {
   const [companiesList, setCompaniesList] = useState<Array<{ id: string; name: string }>>([]);
   
   const [screen, setScreen] = useState<'login' | 'app'>('login');
-  const [tab, setTab] = useState<'dashboard' | 'apply' | 'history' | 'employees' | 'settings'>('dashboard');
+  const [tab, setTabState] = useState<'dashboard' | 'apply' | 'history' | 'employees' | 'settings' | '404'>('dashboard');
+
+  const setTab = (newTab: 'dashboard' | 'apply' | 'history' | 'employees' | 'settings' | '404') => {
+    if (!currentUser && newTab !== '404') {
+      alert('로그인이 필요한 서비스입니다.');
+      setScreen('login');
+      window.location.hash = '';
+      return;
+    }
+    if (currentUser && currentUser.role !== 'admin' && (newTab === 'employees' || newTab === 'settings')) {
+      alert('관리자 전용 페이지입니다. 접근 권한이 없습니다.');
+      setTabState('dashboard');
+      window.location.hash = 'dashboard';
+      return;
+    }
+    setTabState(newTab);
+    if (newTab !== '404') window.location.hash = newTab;
+  };
+
+  // URL Hash Sync & Auth/Role Guard
+  useEffect(() => {
+    const handleHashChange = () => {
+      const rawHash = window.location.hash.replace('#', '').trim();
+      if (!rawHash) return;
+
+      const validTabs = ['dashboard', 'apply', 'history', 'employees', 'settings'];
+      if (!currentUser) {
+        alert('로그인이 필요한 서비스입니다.');
+        setScreen('login');
+        window.location.hash = '';
+        return;
+      }
+      if (currentUser.role !== 'admin' && (rawHash === 'employees' || rawHash === 'settings')) {
+        alert('관리자 전용 페이지입니다. 접근 권한이 없습니다.');
+        setTabState('dashboard');
+        window.location.hash = 'dashboard';
+        return;
+      }
+      if (validTabs.includes(rawHash)) {
+        setTabState(rawHash as any);
+      } else {
+        setTabState('404');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    if (window.location.hash && currentUser) handleHashChange();
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [currentUser]);
 
   const leaveTypes = useMemo(() => {
     if (!company) return BASE_LEAVE_TYPES;
@@ -290,6 +367,7 @@ export default function App() {
       setEmployees([]);
       setLeaves([]);
       setScreen('login');
+      window.location.hash = '';
       const list = await authAPI.listCompanies();
       setCompaniesList(list);
     } catch (err) {
@@ -353,6 +431,7 @@ export default function App() {
             {tab === 'history' && <LeaveHistory currentUser={currentUser!} leaves={leaves} employees={employees} leaveTypes={leaveTypes} allLeaveTypes={allLeaveTypes} isAdmin={isAdmin} onApprove={loadAppData} />}
             {tab === 'employees' && isAdmin && <EmployeeMgmt employees={employees} currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} allLeaveTypes={allLeaveTypes} onUpdate={loadAppData} />}
             {tab === 'settings' && isAdmin && <CompanySettings company={company!} employees={employees} currentUser={currentUser!} onSave={loadAppData} />}
+            {tab === '404' && <NotFoundScreen onGoHome={() => setTab('dashboard')} />}
           </>
         )}
       </main>
@@ -1728,8 +1807,14 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
     setShowForm(true);
   };
 
+  const [isEmpSaving, setIsEmpSaving] = useState(false);
+
   const save = async () => {
     if (!form.name || !form.email || !form.joinDate) return alert('이름, 이메일, 입사일은 필수항목입니다.');
+    const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(form.email.trim())) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
+
+    setIsEmpSaving(true);
     try {
       if (editId) {
         const res = await employeeAPI.updateEmployee(editId, {
@@ -1751,6 +1836,8 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
       onUpdate();
     } catch (err: any) {
       alert(err.response?.data?.message || '직원 저장 실패');
+    } finally {
+      setIsEmpSaving(false);
     }
   };
 
@@ -1898,8 +1985,8 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setShowForm(false)}>취소</button>
-              <button className="btn btn-primary" onClick={save}>저장</button>
+              <button className="btn btn-ghost" onClick={() => setShowForm(false)} disabled={isEmpSaving}>취소</button>
+              <button className="btn btn-primary" onClick={save} disabled={isEmpSaving}>{isEmpSaving ? '저장 중...' : '저장'}</button>
             </div>
           </div>
         </div>
@@ -2087,14 +2174,20 @@ function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose
     }
   };
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const handleDeleteLeave = async (leaveId: string) => {
+    if (deletingId) return;
     if (!confirm('해당 휴가 내역을 정말로 삭제하시겠습니까? 삭제 후에는 연차 사용 일수가 즉시 재산출됩니다.')) return;
+    setDeletingId(leaveId);
     try {
       await leaveAPI.deleteLeave(leaveId);
       alert('휴가 내역이 삭제되었습니다.');
       onRefresh();
     } catch (err: any) {
       alert(err.response?.data?.message || '삭제 처리에 실패했습니다.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -2356,7 +2449,9 @@ function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose
                           <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: 4 }}>
                               <button className="btn" onClick={() => setEditingLeave(l)} style={{ padding: '3px 8px', fontSize: 10 }}>수정</button>
-                              <button className="btn btn-danger" onClick={() => handleDeleteLeave(l.id)} style={{ padding: '3px 8px', fontSize: 10 }}>삭제</button>
+                              <button className="btn btn-danger" onClick={() => handleDeleteLeave(l.id)} disabled={deletingId === l.id} style={{ padding: '3px 8px', fontSize: 10 }}>
+                                {deletingId === l.id ? '삭제중' : '삭제'}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -2392,9 +2487,21 @@ function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose
   );
 }
 
-function LOAForm({ emp, onSave, onCancel }: { emp: Employee; onSave: (emp: Employee, start: string | null, end: string | null) => void; onCancel: () => void }) {
+function LOAForm({ emp, onSave, onCancel }: { emp: Employee; onSave: (emp: Employee, start: string | null, end: string | null) => Promise<void> | void; onCancel: () => void }) {
   const [start, setStart] = useState(emp.leave_of_absence?.start || '');
   const [end, setEnd] = useState(emp.leave_of_absence?.end || '');
+  const [isLoaSaving, setIsLoaSaving] = useState(false);
+
+  const handleLoaSave = async (s: string | null, e: string | null) => {
+    if (isLoaSaving) return;
+    setIsLoaSaving(true);
+    try {
+      await onSave(emp, s, e);
+    } finally {
+      setIsLoaSaving(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -2408,11 +2515,15 @@ function LOAForm({ emp, onSave, onCancel }: { emp: Employee; onSave: (emp: Emplo
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-        <button className="btn btn-primary" onClick={() => onSave(emp, start, end)}>휴직 일정 적용</button>
+        <button className="btn btn-primary" onClick={() => handleLoaSave(start, end)} disabled={isLoaSaving}>
+          {isLoaSaving ? '처리 중...' : '휴직 일정 적용'}
+        </button>
         {emp.leave_of_absence && (
-          <button className="btn btn-danger" onClick={() => onSave(emp, null, null)}>휴직 해제 처리</button>
+          <button className="btn btn-danger" onClick={() => handleLoaSave(null, null)} disabled={isLoaSaving}>
+            {isLoaSaving ? '처리 중...' : '휴직 해제 처리'}
+          </button>
         )}
-        <button className="btn" onClick={onCancel}>닫기</button>
+        <button className="btn" onClick={onCancel} disabled={isLoaSaving}>닫기</button>
       </div>
     </div>
   );
@@ -2426,6 +2537,8 @@ function CompanySettings({ company, employees, currentUser, onSave }: {
   onSave: () => void;
 }) {
   const [local, setLocal] = useState<Company>({ ...company });
+  const [isSaving, setIsSaving] = useState(false);
+
   const myEmps = useMemo(() => employees.filter(e => e.company_id === currentUser.company_id && e.status === 'active'), [employees, currentUser]);
   const admins = myEmps.filter(e => e.role === 'admin');
   const nonAdmins = myEmps.filter(e => e.role !== 'admin');
@@ -2433,6 +2546,12 @@ function CompanySettings({ company, employees, currentUser, onSave }: {
   const set = (k: keyof Company, v: any) => setLocal(p => ({ ...p, [k]: v }));
   
   const save = async () => {
+    if (isSaving) return;
+    const invalidGeneral = (local.general_types || []).some(g => isNaN(Number(g.days)) || Number(g.days) < 0);
+    const invalidFamily = (local.family_types || []).some(f => isNaN(Number(f.days)) || Number(f.days) < 0);
+    if (invalidGeneral || invalidFamily) return alert('휴가 일수에는 0 이상의 유효한 숫자만 입력해 주세요.');
+
+    setIsSaving(true);
     try {
       const res = await companyAPI.updateCompany(local);
       if (res.success) {
@@ -2441,6 +2560,8 @@ function CompanySettings({ company, employees, currentUser, onSave }: {
       }
     } catch (err: any) {
       alert(err.response?.data?.message || '회사 설정 저장 실패');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2847,8 +2968,8 @@ function CompanySettings({ company, employees, currentUser, onSave }: {
         )}
       </div>
 
-      <button className="btn btn-primary" onClick={save} style={{ height: 44, fontSize: 14, fontWeight: 600 }}>
-        회사 운영 규정 전체 저장 적용
+      <button className="btn btn-primary" onClick={save} disabled={isSaving} style={{ height: 44, fontSize: 14, fontWeight: 600 }}>
+        {isSaving ? '저장 중...' : '회사 운영 규정 전체 저장 적용'}
       </button>
     </div>
   );
@@ -2857,8 +2978,8 @@ function CompanySettings({ company, employees, currentUser, onSave }: {
 // ---------- Login / Register Screen ----------
 function LoginScreen({ companies, onLogin, onRegister }: {
   companies: Array<{ id: string; name: string }>;
-  onLogin: (email: string, password?: string) => void;
-  onRegister: (data: any) => void;
+  onLogin: (email: string, password?: string) => Promise<void> | void;
+  onRegister: (data: any) => Promise<void> | void;
 }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [rememberEmail, setRememberEmail] = useState(() => {
@@ -2868,8 +2989,14 @@ function LoginScreen({ companies, onLogin, onRegister }: {
     return localStorage.getItem('saved_email') || '';
   });
   const [loginPassword, setLoginPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLoginSubmit = () => {
+  const handleLoginSubmit = async () => {
+    if (submitting) return;
+    if (!email.trim()) return alert('이메일 주소를 입력해 주세요.');
+    const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(email.trim())) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
+
     if (rememberEmail) {
       localStorage.setItem('saved_email', email);
       localStorage.setItem('remember_email', 'true');
@@ -2877,7 +3004,12 @@ function LoginScreen({ companies, onLogin, onRegister }: {
       localStorage.removeItem('saved_email');
       localStorage.removeItem('remember_email');
     }
-    onLogin(email, loginPassword);
+    setSubmitting(true);
+    try {
+      await onLogin(email, loginPassword);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Registration form
@@ -2899,30 +3031,36 @@ function LoginScreen({ companies, onLogin, onRegister }: {
     );
   }, [companies, companySearch]);
 
-  const register = () => {
+  const register = async () => {
+    if (submitting) return;
     if (!name || !email || !joinDate || !password || !confirmPassword) return alert('이름, 이메일, 입사일, 비밀번호는 필수 입력사항입니다.');
     const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(email)) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
+    if (!emailRegex.test(email.trim())) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
     const pwRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
     if (!pwRegex.test(password)) return alert('비밀번호는 영문, 숫자 혼합 8자 이상이어야 합니다.');
     if (password !== confirmPassword) return alert('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
     if (!selectedCompany && !newCompanyName) return alert('회사를 선택하거나 새 회사명을 입력해주세요.');
     
-    onRegister({
-      name,
-      email,
-      phone,
-      joinDate,
-      department: dept,
-      companyId: selectedCompany?.id,
-      newCompanyName: selectedCompany ? undefined : newCompanyName,
-      password,
-    });
-    setMode('login');
-    setEmail('');
-    setLoginPassword('');
-    setPassword('');
-    setConfirmPassword('');
+    setSubmitting(true);
+    try {
+      await onRegister({
+        name,
+        email,
+        phone,
+        joinDate,
+        department: dept,
+        companyId: selectedCompany?.id,
+        newCompanyName: selectedCompany ? undefined : newCompanyName,
+        password,
+      });
+      setMode('login');
+      setEmail('');
+      setLoginPassword('');
+      setPassword('');
+      setConfirmPassword('');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -3007,8 +3145,8 @@ function LoginScreen({ companies, onLogin, onRegister }: {
                   ID(이메일 주소) 저장
                 </label>
               </div>
-              <button className="btn btn-primary" onClick={handleLoginSubmit} style={{ height: 44, fontSize: 14 }}>
-                로그인 <ArrowRight size={16} />
+              <button className="btn btn-primary" onClick={handleLoginSubmit} disabled={submitting} style={{ height: 44, fontSize: 14 }}>
+                {submitting ? '로그인 중...' : <>로그인 <ArrowRight size={16} /></>}
               </button>
             </div>
           ) : (
@@ -3095,8 +3233,8 @@ function LoginScreen({ companies, onLogin, onRegister }: {
                 </div>
               )}
 
-              <button className="btn btn-primary" onClick={register} style={{ height: 44, fontSize: 14, marginTop: 6 }}>
-                가입 완료 및 계정 생성
+              <button className="btn btn-primary" onClick={register} disabled={submitting} style={{ height: 44, fontSize: 14, marginTop: 6 }}>
+                {submitting ? '가입 진행 중...' : '가입 완료 및 계정 생성'}
               </button>
             </div>
           )}
