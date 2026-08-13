@@ -1104,6 +1104,7 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
   const [searchEmpName, setSearchEmpName] = useState<string>('');
   const [startDateFilter, setStartDateFilter] = useState<string>('');
   const [endDateFilter, setEndDateFilter] = useState<string>('');
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null); // 개별 승인/반려/취소 중복 클릭 방지
 
   const myLeaves = useMemo(() =>
     isAdmin ? leaves.filter(l => employees.some(e => e.id === l.emp_id && e.company_id === currentUser.company_id))
@@ -1178,6 +1179,8 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
   };
 
   const handleAction = async (id: string, status: 'approved' | 'rejected') => {
+    if (actionLoadingId) return; // 중복 클릭 방지
+    setActionLoadingId(id + '_' + status);
     try {
       const res = await leaveAPI.updateLeaveStatus(id, status);
       if (res.success) {
@@ -1185,17 +1188,23 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
       }
     } catch (err: any) {
       alert(err.response?.data?.message || '처리에 실패했습니다.');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
   const handleCancelMyLeave = async (id: string) => {
+    if (actionLoadingId) return; // 중복 클릭 방지
     if (!confirm('신청하신 휴가를 정말 취소하시겠습니까?\n취소 시 연차 사용 일수가 즉시 환급/복원됩니다.')) return;
+    setActionLoadingId(id + '_cancel');
     try {
       await leaveAPI.deleteLeave(id);
       alert('휴가 신청이 취소 처리되었습니다.');
       onApprove();
     } catch (err: any) {
       alert(err.response?.data?.message || '취소 처리에 실패했습니다.');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -1384,11 +1393,21 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
                       <div style={{ display: 'inline-flex', gap: 6 }}>
                         {isAdmin && l.status === 'pending' && (
                           <>
-                            <button className="btn btn-primary" onClick={() => handleAction(l.id, 'approved')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
-                              <Check size={12} /> 승인
+                            <button
+                              className="btn btn-primary"
+                              onClick={() => handleAction(l.id, 'approved')}
+                              style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}
+                              disabled={actionLoadingId !== null}
+                            >
+                              {actionLoadingId === l.id + '_approved' ? '처리 중...' : <><Check size={12} /> 승인</>}
                             </button>
-                            <button className="btn btn-danger" onClick={() => handleAction(l.id, 'rejected')} style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}>
-                              <X size={12} /> 반려
+                            <button
+                              className="btn btn-danger"
+                              onClick={() => handleAction(l.id, 'rejected')}
+                              style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}
+                              disabled={actionLoadingId !== null}
+                            >
+                              {actionLoadingId === l.id + '_rejected' ? '처리 중...' : <><X size={12} /> 반려</>}
                             </button>
                           </>
                         )}
@@ -1402,9 +1421,9 @@ function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveType
                             className="btn btn-danger" 
                             onClick={() => handleCancelMyLeave(l.id)} 
                             style={{ padding: '4px 8px', fontSize: 11 }}
-                            disabled={l.status === 'rejected'}
+                            disabled={l.status === 'rejected' || actionLoadingId !== null}
                           >
-                            {l.status === 'approved' ? '취소 요청 (삭제)' : '신청 취소'}
+                            {actionLoadingId === l.id + '_cancel' ? '취소 중...' : (l.status === 'approved' ? '취소 요청 (삭제)' : '신청 취소')}
                           </button>
                         )}
                       </div>
@@ -1653,8 +1672,12 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
     });
   }, [employees, currentUser, sortBy, leaves, company]);
 
+  const [regActionLoadingId, setRegActionLoadingId] = useState<string | null>(null); // 가입 승인/거절 중복 클릭 방지
+
   const handleApproveRegistration = async (emp: Employee) => {
+    if (regActionLoadingId) return; // 중복 클릭 방지
     if (confirm(`${emp.name}님의 회원가입을 승인하시겠습니까?\n승인 시 즉시 시스템 로그인이 가능해집니다.`)) {
+      setRegActionLoadingId(emp.id + '_approve');
       try {
         const res = await employeeAPI.updateEmployee(emp.id, { status: 'active' });
         if (res.success) {
@@ -1663,12 +1686,16 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
         }
       } catch (err: any) {
         alert(err.response?.data?.message || '승인 처리 실패');
+      } finally {
+        setRegActionLoadingId(null);
       }
     }
   };
 
   const handleRejectRegistration = async (emp: Employee) => {
+    if (regActionLoadingId) return; // 중복 클릭 방지
     if (confirm(`${emp.name}님의 회원가입 신청을 거절(삭제)하시겠습니까?`)) {
+      setRegActionLoadingId(emp.id + '_reject');
       try {
         const res = await employeeAPI.updateEmployee(emp.id, { status: 'resigned' });
         if (res.success) {
@@ -1677,6 +1704,8 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
         }
       } catch (err: any) {
         alert(err.response?.data?.message || '거부 처리 실패');
+      } finally {
+        setRegActionLoadingId(null);
       }
     }
   };
@@ -1794,11 +1823,21 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
                 </div>
 
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-primary" onClick={() => handleApproveRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
-                    <Check size={12} /> 승인
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => handleApproveRegistration(emp)}
+                    style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
+                    disabled={regActionLoadingId !== null}
+                  >
+                    {regActionLoadingId === emp.id + '_approve' ? '처리 중...' : <><Check size={12} /> 승인</>}
                   </button>
-                  <button className="btn btn-danger" onClick={() => handleRejectRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
-                    <X size={12} /> 거절
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => handleRejectRegistration(emp)}
+                    style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
+                    disabled={regActionLoadingId !== null}
+                  >
+                    {regActionLoadingId === emp.id + '_reject' ? '처리 중...' : <><X size={12} /> 거절</>}
                   </button>
                 </div>
               </div>
@@ -1951,11 +1990,21 @@ function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, all
                     <div style={{ display: 'inline-flex', gap: 6 }}>
                       {emp.status === 'pending' ? (
                         <>
-                          <button className="btn btn-primary" onClick={() => handleApproveRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
-                            <Check size={12} /> 승인
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => handleApproveRegistration(emp)}
+                            style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
+                            disabled={regActionLoadingId !== null}
+                          >
+                            {regActionLoadingId === emp.id + '_approve' ? '처리 중...' : <><Check size={12} /> 승인</>}
                           </button>
-                          <button className="btn btn-danger" onClick={() => handleRejectRegistration(emp)} style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}>
-                            <X size={12} /> 거절
+                          <button
+                            className="btn btn-danger"
+                            onClick={() => handleRejectRegistration(emp)}
+                            style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
+                            disabled={regActionLoadingId !== null}
+                          >
+                            {regActionLoadingId === emp.id + '_reject' ? '처리 중...' : <><X size={12} /> 거절</>}
                           </button>
                         </>
                       ) : (
@@ -2852,6 +2901,8 @@ function LoginScreen({ companies, onLogin, onRegister }: {
 
   const register = () => {
     if (!name || !email || !joinDate || !password || !confirmPassword) return alert('이름, 이메일, 입사일, 비밀번호는 필수 입력사항입니다.');
+    const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(email)) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
     const pwRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
     if (!pwRegex.test(password)) return alert('비밀번호는 영문, 숫자 혼합 8자 이상이어야 합니다.');
     if (password !== confirmPassword) return alert('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
