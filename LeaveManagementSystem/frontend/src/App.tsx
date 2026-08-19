@@ -1,3694 +1,1727 @@
-import { useState, useMemo, useEffect } from 'react';
-import { 
-  Calendar as CalendarIcon, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Plus, 
-  FileText, 
-  Check, 
-  X, 
-  Building, 
-  Clock, 
-  Shield, 
-  Briefcase, 
-  Info, 
-  ShieldAlert, 
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  UserPlus,
-  CheckCircle
-} from 'lucide-react';
-import { authAPI, companyAPI, employeeAPI, leaveAPI } from './api';
-import type { Employee, Company, Leave } from './api';
-import { getCurrentLeaveBalance, daysInRange, parseLocalDate, formatLocalDate } from './utils/leaveCalc';
-import { formatPhone, formatBizRegNo } from './utils/format';
+import React, {
+  useState, useMemo, useCallback, useReducer,
+  useRef, useEffect, useTransition, memo,
+} from "react";
 
-const BASE_LEAVE_TYPES = [
-  { id: 'annual', label: '연차', color: '#4F46E5', bg: '#EEF2FF', exempt: false, fixed: true },
-  { id: 'am_half', label: '오전반차', color: '#6366F1', bg: '#EEF2FF', exempt: false, fixed: true, defaultUnit: 0.5 },
-  { id: 'pm_half', label: '오후반차', color: '#4338CA', bg: '#EEF2FF', exempt: false, fixed: true, defaultUnit: 0.5 },
-  { id: 'military', label: '예비군/민방위', color: '#D97706', bg: '#FFFBEB', exempt: true, fixed: true },
-  { id: 'maternity', label: '출산전후휴가', color: '#7C3AED', bg: '#F5F3FF', exempt: true, fixed: true },
-  { id: 'parental', label: '육아휴직', color: '#0891B2', bg: '#ECFEFF', exempt: true, fixed: true, isLeaveOfAbsence: true },
-  { id: 'paternity', label: '배우자출산휴가', color: '#0284C7', bg: '#E0F2FE', exempt: true, fixed: true },
-  { id: 'menstrual', label: '생리휴가', color: '#DB2777', bg: '#FDF2F8', exempt: true, fixed: true },
-  { id: 'pregnancy_short', label: '임산부단축근무', color: '#9333EA', bg: '#FAF5FF', exempt: true, fixed: true },
-  { id: 'civil', label: '공민권행사', color: '#374151', bg: '#F3F4F6', exempt: true, fixed: true },
-  { id: 'unpaid_annual', label: '무급 연차신청', color: '#6B7280', bg: '#F3F4F6', exempt: true, fixed: true },
-  { id: 'unearned_annual', label: '연차 선사용(사전승인필요)', color: '#EF4444', bg: '#FEF2F2', exempt: false, fixed: true },
+// ═══════════════════════════════════════════════════════════════
+// 1. 타입 & 상수 & 초기 데이터
+// ═══════════════════════════════════════════════════════════════
+const ROLE = Object.freeze({ ADMIN: "admin", USER: "user" });
+const VIEW = Object.freeze({
+  DASH: "dash",
+  PRODUCTS: "products",
+  SCAN: "scan",
+  HISTORY: "history",
+  MEMBERS: "members",
+  COMPANY: "company",
+  SETTINGS: "settings",
+});
+
+const CATS = Object.freeze(["의료소모품", "의료기기/장비", "의약품", "사무용품", "일반소모품"]);
+const DEPARTS = Object.freeze(["진료과", "간호부", "원무과", "수술실", "검사의학과", "행정팀"]);
+const POSITIONS = Object.freeze(["원장/의사", "수간호사", "간호사", "의료기사", "팀장", "사원"]);
+const PAGE_OPTS = Object.freeze([10, 20, 30, 50]);
+const LS_EMAIL = "__inv_email__";
+const TOAST_MS = 2400;
+const SKEL_MS = Object.freeze({ DASH: 200, PRODUCTS: 200, HISTORY: 180, MEMBERS: 180, COMPANY: 180 });
+const JSQR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
+const JSQR_ID = "__jsqr__";
+const VALID_VIEWS = new Set(Object.values(VIEW));
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+// 회사/원내 기본 정보 초기 데이터
+const INIT_COMPANY = {
+  name: "메디컬 원내 중앙재고센터",
+  code: "HOSP-MED-01",
+  bizNo: "123-45-67890",
+  ceo: "김원장",
+  phone: "02-1234-5678",
+  email: "admin@medical-center.co.kr",
+  address: "서울특별시 강남구 테헤란로 123 메디컬타워 3-5층",
+  departments: [...DEPARTS],
+  lowStockNotify: true,
+  autoBarcodePrefix: "MED",
+  updatedAt: "2025-06-01",
+};
+
+// 직원/회원 관리 초기 데이터
+const INIT_USERS = [
+  {
+    id: 1,
+    empNo: "EMP-001",
+    name: "김관리",
+    email: "admin@company.com",
+    password: "admin1234",
+    phone: "010-1234-5678",
+    department: "원무과",
+    position: "팀장",
+    role: ROLE.ADMIN,
+    status: "재직",
+    createdAt: "2024-01-01",
+  },
+  {
+    id: 2,
+    empNo: "EMP-002",
+    name: "홍길동",
+    email: "user@company.com",
+    password: "user1234a",
+    phone: "010-9876-5432",
+    department: "간호부",
+    position: "간호사",
+    role: ROLE.USER,
+    status: "재직",
+    createdAt: "2024-03-15",
+  },
+  {
+    id: 3,
+    empNo: "EMP-003",
+    name: "이영희",
+    email: "yh.lee@company.com",
+    password: "user1234a",
+    phone: "010-5555-7777",
+    department: "수술실",
+    position: "수간호사",
+    role: ROLE.USER,
+    status: "재직",
+    createdAt: "2024-05-10",
+  },
 ];
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// 상품 정보 초기 데이터
+const INIT_PRODUCTS = [
+  { id: 1, code: "PRD-001", name: "멸균 주사기 5ml (100개입)", category: "의료소모품", qty: 35, minQty: 10, unit: "박스", price: 25000, location: "A-01-02", barcodeType: "QR/1D", updatedAt: "2025-06-10" },
+  { id: 2, code: "PRD-002", name: "디지털 체온계 (비접촉식)", category: "의료기기/장비", qty: 4, minQty: 8, unit: "개", price: 85000, location: "B-03-01", barcodeType: "QR/1D", updatedAt: "2025-06-11" },
+  { id: 3, code: "PRD-003", name: "생리식염수 500ml", category: "의약품", qty: 120, minQty: 30, unit: "팩", price: 3200, location: "C-02-04", barcodeType: "QR/1D", updatedAt: "2025-06-12" },
+  { id: 4, code: "PRD-004", name: "니트릴 장갑 L (200매)", category: "의료소모품", qty: 7, minQty: 15, unit: "곽", price: 18000, location: "A-02-05", barcodeType: "QR/1D", updatedAt: "2025-06-09" },
+  { id: 5, code: "PRD-005", name: "손소독제 500ml", category: "일반소모품", qty: 3, minQty: 10, unit: "개", price: 6500, location: "D-01-01", barcodeType: "QR/1D", updatedAt: "2025-06-08" },
+  { id: 6, code: "PRD-006", name: "A4 복사용지 (500매)", category: "사무용품", qty: 50, minQty: 20, unit: "권", price: 7500, location: "E-01-03", barcodeType: "QR/1D", updatedAt: "2025-06-07" },
+];
 
-function fmtUnit(u: number) {
-  if (u === 1) return '(1일)';
-  if (u === 0.5) return '(0.5일)';
-  if (u === 0.25) return '(0.25일)';
-  return `(${u}일)`;
+// 입출고 이력 초기 데이터
+const INIT_HISTORY = [
+  { id: 1, productCode: "PRD-001", productName: "멸균 주사기 5ml (100개입)", type: "입고", qty: 20, department: "간호부", by: "김관리", date: "2025-06-10", note: "정기 입고" },
+  { id: 2, productCode: "PRD-002", productName: "디지털 체온계 (비접촉식)", type: "출고", qty: 2, department: "진료과", by: "홍길동", date: "2025-06-11", note: "진료실 배출" },
+  { id: 3, productCode: "PRD-003", productName: "생리식염수 500ml", type: "입고", qty: 50, department: "수술실", by: "김관리", date: "2025-06-12", note: "응급실 보충" },
+];
+
+const BLANK_PRD = Object.freeze({
+  code: "",
+  name: "",
+  category: "의료소모품",
+  qty: 0,
+  minQty: 10,
+  unit: "개",
+  price: 0,
+  location: "A-01-01",
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 2. 전역 CSS (1회 주입)
+// ═══════════════════════════════════════════════════════════════
+if (typeof document !== "undefined" && !document.getElementById("__inv__")) {
+  const st = document.createElement("style");
+  st.id = "__inv__";
+  st.textContent = `
+    @keyframes shimmer { 0%{background-position:-600px 0} 100%{background-position:600px 0} }
+    @keyframes fadeUp  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes slideUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+    *, *::before, *::after { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html { height:-webkit-fill-available; }
+    body { margin:0; min-height:100vh; min-height:-webkit-fill-available; overscroll-behavior:none; background:#f4f6f9; }
+    input, select, textarea, button { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,sans-serif; }
+    input[type=number] { -moz-appearance:textfield; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
+    video { object-fit:cover; }
+    @media print {
+      body * { visibility: hidden; }
+      #printable-label, #printable-label * { visibility: visible; }
+      #printable-label { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  `;
+  document.head.appendChild(st);
 }
 
-function formatDateStr(dateStr: string) {
-  if (!dateStr) return '';
-  try {
-    const d = parseLocalDate(dateStr);
-    if (isNaN(d.getTime())) return dateStr.slice(0, 10);
-    return formatLocalDate(d);
-  } catch {
-    return dateStr.slice(0, 10);
+// ═══════════════════════════════════════════════════════════════
+// 3. 유효성 검사
+// ═══════════════════════════════════════════════════════════════
+const V = Object.freeze({
+  email: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v ?? "").trim()) ? "" : "올바른 이메일 형식이 아닙니다.",
+  password: (v: string) => /^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(v ?? "") ? "" : "비밀번호는 6자 이상, 영문+숫자를 포함해야 합니다.",
+  uname: (v: string) => (v ?? "").trim().length >= 2 ? "" : "이름은 2자 이상이어야 합니다.",
+  code: (v: string) => /^[A-Z0-9-]{2,12}$/i.test((v ?? "").trim()) ? "" : "코드 형식: 영문/숫자/하이픈 2~12자 (예: PRD-001)",
+  pname: (v: string) => (v ?? "").trim().length >= 2 ? "" : "상품명은 2자 이상이어야 합니다.",
+  posInt: (v: any) => { const n = Number(v); return Number.isFinite(n) && Number.isInteger(n) && n >= 0 ? "" : "0 이상의 정수를 입력하세요."; },
+  posNum: (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? "" : "0 이상의 숫자를 입력하세요."; },
+  phone: (v: string) => /^[0-9-]{8,15}$/.test((v ?? "").trim()) ? "" : "올바른 전화번호 형식이 아닙니다.",
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 4. localStorage 헬퍼
+// ═══════════════════════════════════════════════════════════════
+const ls = Object.freeze({
+  get: (k: string) => { try { return localStorage.getItem(k) ?? ""; } catch { return ""; } },
+  set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 무시 */ } },
+  del: (k: string) => { try { localStorage.removeItem(k); } catch { /* 무시 */ } },
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 5. Reducers
+// ═══════════════════════════════════════════════════════════════
+function prdReducer(state: any[], action: any) {
+  switch (action.type) {
+    case "ADD": return [...state, { ...action.payload, id: Date.now(), updatedAt: today() }];
+    case "UPDATE": return state.map((p) => (p.id === action.payload.id ? { ...action.payload, updatedAt: today() } : p));
+    case "DELETE": return state.filter((p) => p.id !== action.id);
+    case "ADJ":
+      return state.map((p) =>
+        p.id === action.id
+          ? { ...p, qty: Math.max(0, (p.qty ?? 0) + (Number.isFinite(action.delta) ? action.delta : 0)), updatedAt: today() }
+          : p
+      );
+    default: return state;
   }
 }
 
-// Global Badge component
-const StatusBadge = ({ label, color, bg }: { label: string; color: string; bg: string }) => (
-  <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20, background: bg, color, border: `1px solid ${color}20`, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>
-    {label}
+function usrReducer(state: any[], action: any) {
+  const adminCount = () => state.filter((u) => u.role === ROLE.ADMIN).length;
+  switch (action.type) {
+    case "ADD": return [...state, { ...action.payload, id: Date.now(), createdAt: today() }];
+    case "UPDATE": return state.map((u) => (u.id === action.payload.id ? { ...u, ...action.payload } : u));
+    case "DELETE":
+      if (adminCount() === 1 && state.find((u) => u.id === action.id)?.role === ROLE.ADMIN) return state;
+      return state.filter((u) => u.id !== action.id);
+    case "TOGGLE_ROLE":
+      if (adminCount() === 1 && state.find((u) => u.id === action.id)?.role === ROLE.ADMIN) return state;
+      return state.map((u) => (u.id === action.id ? { ...u, role: u.role === ROLE.ADMIN ? ROLE.USER : ROLE.ADMIN } : u));
+    default: return state;
+  }
+}
+
+function histReducer(state: any[], action: any) {
+  return action.type === "ADD" ? [...state, { ...action.payload, id: Date.now() }] : state;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 6. 디자인 토큰 & 공유 스타일
+// ═══════════════════════════════════════════════════════════════
+const T = Object.freeze({
+  bg: "#f4f6f9",
+  sur: "#ffffff",
+  bdr: "#e2e8f0",
+  muted: "#8492a6",
+  text: "#1e293b",
+  sub: "#475569",
+  red: "#ef4444",
+  green: "#10b981",
+  indigo: "#6366f1",
+  blue: "#3b82f6",
+  orange: "#f59e0b",
+  r: 12,
+});
+
+const INP = Object.freeze({
+  width: "100%",
+  padding: "11px 13px",
+  borderRadius: 9,
+  fontSize: 15,
+  outline: "none",
+  background: T.sur,
+  color: T.text,
+  WebkitAppearance: "none" as const,
+  transition: "border .15s",
+  touchAction: "manipulation" as const,
+});
+
+const ROW = Object.freeze({ display: "flex", justifyContent: "space-between", alignItems: "center" });
+
+// ═══════════════════════════════════════════════════════════════
+// 7. 커스텀 훅
+// ═══════════════════════════════════════════════════════════════
+function useReady(ms = 220) {
+  const [ok, setOk] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setOk(true), ms); return () => clearTimeout(t); }, [ms]);
+  return ok;
+}
+
+function useDeviceInfo() {
+  return useMemo(() => {
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent ?? "" : "";
+    return Object.freeze({
+      ios: /iP(hone|od|ad)/i.test(ua),
+      android: /Android/i.test(ua),
+      secure: typeof location !== "undefined" && (location.protocol === "https:" || location.hostname === "localhost"),
+      hasMedia: typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia,
+    });
+  }, []);
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>⚠️</div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, margin: "0 0 8px" }}>예상치 못한 오류가 발생했습니다</h2>
+          <p style={{ fontSize: 14, color: T.muted, margin: "0 0 24px", lineHeight: 1.6 }}>앱을 다시 시작하면 해결되는 경우가 많습니다.</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ border: "none", borderRadius: 9, padding: "11px 24px", fontSize: 14, fontWeight: 700, background: T.text, color: "#fff", cursor: "pointer" }}>
+            다시 시도
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function useThrottle(fn: Function, ms = 700) {
+  const busy = useRef(false);
+  return useCallback((...args: any[]) => {
+    if (busy.current) return;
+    busy.current = true;
+    fn(...args);
+    setTimeout(() => { busy.current = false; }, ms);
+  }, [fn, ms]);
+}
+
+function sanitizeNum(v: any) {
+  const s = String(v ?? "").replace(/[^0-9.]/g, "");
+  const parts = s.split(".");
+  return parts.length > 1 ? parts[0] + "." + parts.slice(1).join("") : s;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 8. 1D 바코드 & QR 코드 캔버스 디코더 헬퍼
+// ═══════════════════════════════════════════════════════════════
+function decode1DBarcodePattern(imgData: ImageData): string | null {
+  const { width, height, data } = imgData;
+  const yList = [Math.floor(height * 0.5), Math.floor(height * 0.4), Math.floor(height * 0.6)];
+
+  for (const cy of yList) {
+    let binary = "";
+    for (let x = 0; x < width; x += 2) {
+      const idx = (cy * width + x) * 4;
+      const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+      binary += gray < 128 ? "1" : "0";
+    }
+    const runs: number[] = [];
+    let cur = binary[0], count = 0;
+    for (let i = 0; i < binary.length; i++) {
+      if (binary[i] === cur) count++;
+      else { runs.push(count); cur = binary[i]; count = 1; }
+    }
+    runs.push(count);
+
+    if (runs.length >= 25) {
+      const match = runs.join("").match(/(1\d{4,12})/);
+      if (match && match[1].length >= 8) {
+        return null; // fallback sentinel
+      }
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 9. 공통 UI 컴포넌트
+// ═══════════════════════════════════════════════════════════════
+function Field({ label, error, children }: { label?: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {label && (
+        <label style={{ display: "block", fontSize: 11, color: T.sub, marginBottom: 4, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase" }}>
+          {label}
+        </label>
+      )}
+      {children}
+      {error && <p style={{ color: T.red, fontSize: 12, marginTop: 4, marginBottom: 0 }}>{error}</p>}
+    </div>
+  );
+}
+
+function Input({ label, error, style: s, ...rest }: any) {
+  return (
+    <Field label={label} error={error}>
+      <input style={{ ...INP, border: `1.5px solid ${error ? T.red : T.bdr}`, ...s }} {...rest} />
+    </Field>
+  );
+}
+
+function NumInput({ label, error, onChange, ...rest }: any) {
+  const handle = useCallback((e: any) => {
+    const clean = sanitizeNum(e.target.value);
+    onChange?.({ ...e, target: { ...e.target, value: clean } });
+  }, [onChange]);
+  return (
+    <Field label={label} error={error}>
+      <input
+        inputMode="decimal"
+        style={{ ...INP, border: `1.5px solid ${error ? T.red : T.bdr}` }}
+        onChange={handle}
+        onKeyDown={(e) => {
+          const ok = ["Backspace", "Delete", "Tab", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "."];
+          if (!ok.includes(e.key) && !/^\d$/.test(e.key)) e.preventDefault();
+        }}
+        {...rest}
+      />
+    </Field>
+  );
+}
+
+function Sel({ label, error, children, ...rest }: any) {
+  return (
+    <Field label={label} error={error}>
+      <select style={{ ...INP, border: `1.5px solid ${error ? T.red : T.bdr}`, appearance: "none" }} {...rest}>
+        {children}
+      </select>
+    </Field>
+  );
+}
+
+const BV = Object.freeze({
+  primary: { bg: T.text, fg: "#fff" },
+  danger: { bg: T.red, fg: "#fff" },
+  ghost: { bg: "#e2e8f0", fg: T.sub },
+  success: { bg: T.green, fg: "#fff" },
+  blue: { bg: T.blue, fg: "#fff" },
+});
+
+function Btn({ children, variant = "primary", full, size = "md", style: s, ...rest }: any) {
+  const v = (BV as any)[variant] ?? BV.primary;
+  const pad = size === "sm" ? "7px 12px" : size === "lg" ? "14px 18px" : "10px 16px";
+  const reset = (e: any) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1)"; };
+  return (
+    <button
+      style={{
+        border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700,
+        padding: pad, fontSize: size === "sm" ? 13 : 14, width: full ? "100%" : undefined,
+        minHeight: size === "sm" ? 36 : 44, background: v.bg, color: v.fg,
+        touchAction: "manipulation", WebkitUserSelect: "none", userSelect: "none",
+        transition: "opacity .1s, transform .1s", ...s
+      }}
+      onPointerDown={(e) => { e.currentTarget.style.opacity = ".75"; e.currentTarget.style.transform = "scale(.97)"; }}
+      onPointerUp={reset} onPointerLeave={reset} onPointerCancel={reset}
+      {...rest}>
+      {children}
+    </button>
+  );
+}
+
+const Badge = memo(({ children, color = T.text }: { children: React.ReactNode; color?: string }) => (
+  <span style={{ background: `${color}1a`, color, borderRadius: 99, padding: "3px 9px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+    {children}
   </span>
+));
+Badge.displayName = "Badge";
+
+function Card({ children, accent, style: s }: { children: React.ReactNode; accent?: string; style?: React.CSSProperties }) {
+  return (
+    <div style={{ background: T.sur, borderRadius: T.r, padding: "13px 15px", boxShadow: "0 1px 3px rgba(0,0,0,.04)", borderLeft: accent ? `3.5px solid ${accent}` : undefined, ...s }}>
+      {children}
+    </div>
+  );
+}
+
+const Divider = () => <div style={{ height: 1, background: T.bdr, margin: "8px 0" }} />;
+const SLabel = ({ children }: { children: React.ReactNode }) => (
+  <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 800, color: T.muted, textTransform: "uppercase", letterSpacing: ".5px" }}>{children}</p>
 );
 
-function DashboardSkeleton({ isAdmin }: { isAdmin: boolean }) {
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const pOv = document.body.style.overflow, pTA = document.body.style.touchAction;
+    document.body.style.overflow = "hidden"; document.body.style.touchAction = "none";
+    return () => { document.body.style.overflow = pOv; document.body.style.touchAction = pTA; };
+  }, []);
+  const stop = useCallback((e: any) => e.stopPropagation(), []);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {isAdmin && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="glass-card skeleton" style={{ height: 90, borderRadius: 'var(--radius-lg)' }} />
-          ))}
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.46)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, touchAction: "none" }}
+      onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        style={{
+          background: T.sur, borderRadius: "18px 18px 0 0", width: "100%", maxWidth: 520,
+          maxHeight: "90dvh", overflowY: "auto", WebkitOverflowScrolling: "touch",
+          paddingBottom: "env(safe-area-inset-bottom, 20px)", animation: "slideUp .22s ease"
+        }}
+        onPointerDown={stop}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 0" }}>
+          <span style={{ fontSize: 16, fontWeight: 800 }}>{title}</span>
+          <Btn variant="ghost" size="sm" onPointerDown={onClose}>✕</Btn>
         </div>
-      )}
-      <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? 'repeat(auto-fit, minmax(400px, 1fr))' : '1fr', gap: '1.5rem' }}>
-        {Array.from({ length: isAdmin ? 2 : 1 }).map((_, i) => (
-          <div key={i} className="glass-card skeleton skeleton-card" style={{ height: 180 }} />
-        ))}
+        <div style={{ padding: 16 }}>{children}</div>
       </div>
-      <div className="glass-card skeleton" style={{ height: 400, borderRadius: 'var(--radius-lg)' }} />
     </div>
   );
 }
 
-function TableSkeleton({ cols = 5, rows = 5 }: { cols?: number; rows?: number }) {
+function Toast({ msg, color = T.green }: { msg: string; color?: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div className="skeleton" style={{ height: 40, width: 200, borderRadius: 8 }} />
-      <div className="glass-card" style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {Array.from({ length: rows }).map((_, r) => (
-            <div key={r} style={{ display: 'flex', gap: '1.5rem' }}>
-              {Array.from({ length: cols }).map((_, c) => (
-                <div key={c} className="skeleton" style={{ height: 24, flex: 1, borderRadius: 4 }} />
+    <div
+      style={{
+        position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)", left: "50%", transform: "translateX(-50%)",
+        background: color, color: "#fff", borderRadius: 99, padding: "10px 20px", fontSize: 13, fontWeight: 700, zIndex: 300,
+        whiteSpace: "nowrap", boxShadow: "0 4px 16px rgba(0,0,0,.18)", animation: "fadeUp .2s ease", pointerEvents: "none"
+      }}>
+      {msg}
+    </div>
+  );
+}
+
+const Skel = memo(({ w = "100%", h = 14, r = 6, mb = 0 }: any) => (
+  <div
+    style={{
+      width: w, height: h, borderRadius: r, marginBottom: mb,
+      background: "linear-gradient(90deg,#e8eaed 25%,#f4f5f7 50%,#e8eaed 75%)",
+      backgroundSize: "1200px 100%", animation: "shimmer 1.5s infinite linear"
+    }}
+  />
+));
+Skel.displayName = "Skel";
+
+function SkelCard({ rows = 2 }: { rows?: number }) {
+  return (
+    <div style={{ background: T.sur, borderRadius: T.r, padding: "13px 15px", marginBottom: 8, boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skel key={i} w={i === 0 ? "55%" : "35%"} h={i === 0 ? 14 : 10} mb={i < rows - 1 ? 8 : 0} />
+      ))}
+    </div>
+  );
+}
+
+function Pagination({ page, total, pageSize, onChange }: any) {
+  const pages = total > 0 ? Math.ceil(total / pageSize) : 0;
+  if (pages <= 1) return null;
+  const start = Math.max(1, Math.min(page - 2, pages - 4));
+  const end = Math.min(pages, start + 4);
+  return (
+    <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 14, flexWrap: "wrap" }}>
+      <Btn variant="ghost" size="sm" onPointerDown={() => onChange(Math.max(1, page - 1))} style={{ padding: "8px 13px" }}>‹</Btn>
+      {Array.from({ length: end - start + 1 }, (_, i) => start + i).map((n) => (
+        <Btn key={n} size="sm" variant={n === page ? "primary" : "ghost"} onPointerDown={() => onChange(n)} style={{ padding: "8px 12px", minWidth: 38 }}>
+          {n}
+        </Btn>
+      ))}
+      <Btn variant="ghost" size="sm" onPointerDown={() => onChange(Math.min(pages, page + 1))} style={{ padding: "8px 13px" }}>›</Btn>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 10. 바코드 & QR 코드 라벨 모달 컴포넌트
+// ═══════════════════════════════════════════════════════════════
+function LabelModal({ product, company, onClose }: { product: any; company: any; onClose: () => void }) {
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <Modal title="바코드 / QR 라벨 인쇄" onClose={onClose}>
+      <div id="printable-label" ref={printRef} style={{ background: "#fff", border: `2px dashed ${T.bdr}`, borderRadius: 12, padding: 16, textAlign: "center", marginBottom: 16 }}>
+        <p style={{ margin: "0 0 4px", fontSize: 11, color: T.muted, fontWeight: 700 }}>{company.name}</p>
+        <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 900, color: T.text }}>{product.name}</h3>
+        <p style={{ margin: "0 0 12px", fontSize: 12, color: T.sub }}>
+          코드: <b>{product.code}</b> | 카테고리: {product.category} | 위치: {product.location || "미지정"}
+        </p>
+
+        {/* QR 코드 렌더링 박스 */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 16, alignItems: "center", margin: "12px 0" }}>
+          <div style={{ padding: 8, background: "#fff", border: `1px solid ${T.bdr}`, borderRadius: 8 }}>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(product.code)}`}
+              alt="QR Code"
+              style={{ width: 100, height: 100, display: "block" }}
+            />
+            <span style={{ fontSize: 10, color: T.muted, marginTop: 4, display: "block" }}>2D QR Code</span>
+          </div>
+
+          {/* 1D 바코드 모의 visual */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ height: 50, display: "flex", alignItems: "center", gap: 2, padding: "4px 8px", background: "#fff", border: `1px solid ${T.bdr}`, borderRadius: 6 }}>
+              {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 2, 4, 1, 2, 3, 1, 2].map((w, idx) => (
+                <div key={idx} style={{ width: w * 1.5, height: 40, background: idx % 2 === 0 ? "#000" : "transparent" }} />
               ))}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: T.text, marginTop: 4 }}>{product.code}</span>
+            <span style={{ fontSize: 10, color: T.muted }}>1D Barcode (Code128)</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn variant="ghost" full onPointerDown={onClose}>닫기</Btn>
+        <Btn variant="blue" full onPointerDown={handlePrint}>🖨️ 라벨 인쇄</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 11. 대시보드 뷰
+// ═══════════════════════════════════════════════════════════════
+const Dashboard = memo(function Dashboard({ products, history, company }: any) {
+  const ready = useReady(SKEL_MS.DASH);
+  const { low, recent } = useMemo(() => ({
+    low: (products ?? []).filter((p: any) => (p.qty ?? 0) <= (p.minQty ?? 0)),
+    recent: [...(history ?? [])].reverse().slice(0, 5),
+  }), [products, history]);
+
+  if (!ready) return <>{[3, 2, 4].map((r, i) => <SkelCard key={i} rows={r} />)}</>;
+  return (
+    <div style={{ display: "grid", gap: 12, animation: "fadeUp .25s ease" }}>
+      <Card accent={T.indigo}>
+        <div style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: T.muted, fontWeight: 700 }}>원내 중앙 관리</span>
+          <h2 style={{ fontSize: 17, fontWeight: 900, margin: "2px 0 0", color: T.text }}>{company?.name || "메디컬 재고센터"}</h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.bdr}` }}>
+          {[
+            [(products?.length ?? 0) + " 종", "전체 품목", T.blue],
+            [low.length + " 종", "재고 부족", low.length ? T.red : T.muted],
+            [(history?.length ?? 0) + " 건", "누적 이력", T.indigo],
+          ].map(([val, lb, cl]) => (
+            <div key={lb as string} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: cl as string }}>{val}</div>
+              <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>{lb}</div>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
+
+      {low.length > 0 && (
+        <Card accent={T.red}>
+          <SLabel>⚠ 재고 부족 및 보충 필요 알림 ({low.length}건)</SLabel>
+          {low.map((p: any, i: number) => (
+            <div key={p.id}>{i > 0 && <Divider />}
+              <div style={ROW}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{p.name ?? "-"}</span>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: T.muted }}>위치: {p.location || "미지정"} | 코드: {p.code}</p>
+                </div>
+                <span style={{ fontSize: 12, color: T.red, fontWeight: 800 }}>
+                  {p.qty} / {p.minQty} {p.unit ?? ""}
+                </span>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      <Card>
+        <SLabel>최근 입출고 이력</SLabel>
+        {recent.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: T.muted }}>기록된 이력이 없습니다.</p>
+        ) : (
+          recent.map((h: any, i: number) => (
+            <div key={h.id}>{i > 0 && <Divider />}
+              <div style={ROW}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{h.productName ?? "-"}</span>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: T.muted }}>
+                    {h.department || "원내"} · {h.by ?? ""} · {h.date ?? ""}
+                  </p>
+                </div>
+                <Badge color={h.type === "입고" ? T.green : h.type === "출고" ? T.red : T.orange}>
+                  {h.type} {h.qty}
+                </Badge>
+              </div>
+            </div>
+          ))
+        )}
+      </Card>
     </div>
   );
-}
+});
+Dashboard.displayName = "Dashboard";
 
-function FormSkeleton() {
-  return (
-    <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div className="skeleton" style={{ height: 32, width: 150, borderRadius: 6 }} />
-      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem' }}>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="skeleton" style={{ height: 16, width: 80, borderRadius: 4 }} />
-            <div className="skeleton" style={{ height: 42, width: '100%', borderRadius: 8 }} />
-          </div>
-        ))}
-        <div className="skeleton" style={{ height: 46, width: '100%', borderRadius: 8, marginTop: 12 }} />
-      </div>
-    </div>
-  );
-}
+// ═══════════════════════════════════════════════════════════════
+// 12. 상품 및 재고 관리 뷰
+// ═══════════════════════════════════════════════════════════════
+function ProductModal({ initial, onSave, onClose, codes }: any) {
+  const isEdit = !!(initial && Object.keys(initial).length > 0);
+  const [f, setF] = useState(() => (isEdit ? { ...initial } : { ...BLANK_PRD }));
+  const [err, setErr] = useState<any>({});
+  const set = useCallback((k: string, v: any) => { setF((p: any) => ({ ...p, [k]: v })); setErr((p: any) => ({ ...p, [k]: "" })); }, []);
 
-function NotFoundScreen({ onGoHome }: { onGoHome: () => void }) {
-  return (
-    <div style={{ maxWidth: 520, margin: '3rem auto', textAlign: 'center' }} className="animate-scale">
-      <div className="glass-card" style={{ padding: '2.5rem 2rem', borderRadius: 20, boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#fff', fontSize: 28, fontWeight: 'bold', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3)' }}>✦</div>
-        <span style={{ display: 'inline-block', background: 'var(--primary-light)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, marginBottom: 12, border: '1px solid rgba(79,70,229,0.2)' }}>
-          오류 404
-        </span>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--gray-900)', marginBottom: 8 }}>
-          페이지를 찾을 수 없습니다
-        </h2>
-        <p style={{ fontSize: 14, color: 'var(--gray-500)', lineHeight: 1.6, marginBottom: 24 }}>
-          요청하신 주소의 페이지가 존재하지 않거나,<br />접근 권한이 필요하여 차단되었을 수 있습니다.
-        </p>
-        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 12, border: '1px solid var(--gray-200)', textAlign: 'left', marginBottom: 20, fontSize: 12, color: 'var(--gray-600)' }}>
-          <div style={{ fontWeight: 600, color: 'var(--gray-800)', marginBottom: 6 }}>💡 다음 사항을 확인해 주세요</div>
-          <ul style={{ margin: '0 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <li>입력하신 URL 주소(URL Hash)가 올바른지 확인해 주세요.</li>
-            <li>관리자 전용 페이지의 경우 관리자 계정으로 로그인해야 접근 가능합니다.</li>
-          </ul>
-        </div>
-        <button className="btn btn-primary" onClick={onGoHome} style={{ width: '100%', height: 44, fontSize: 14, fontWeight: 600 }}>
-          🏠 대시보드로 돌아가기
-        </button>
-      </div>
-    </div>
-  );
-}
+  const runV = useCallback(() => {
+    const e: any = {};
+    const ce = V.code(f.code ?? "");
+    if (ce) e.code = ce;
+    else if (!isEdit && (codes ?? []).includes((f.code ?? "").trim().toUpperCase())) e.code = "이미 존재하는 코드입니다.";
+    const ne = V.pname(f.name); if (ne) e.name = ne;
+    const qe = V.posInt(f.qty); if (qe) e.qty = qe;
+    const me = V.posInt(f.minQty); if (me) e.minQty = me;
+    const pe = V.posNum(f.price); if (pe) e.price = pe;
+    if (!(f.unit ?? "").trim()) e.unit = "단위를 입력하세요.";
+    return e;
+  }, [f, isEdit, codes]);
 
-export default function App() {
-  const [loading, setLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [leaves, setLeaves] = useState<Leave[]>([]);
-  const [companiesList, setCompaniesList] = useState<Array<{ id: string; name: string }>>([]);
-  
-  const [screen, setScreen] = useState<'login' | 'app'>('login');
-  const [tab, setTabState] = useState<'dashboard' | 'apply' | 'history' | 'employees' | 'settings' | '404'>('dashboard');
-
-  const setTab = (newTab: 'dashboard' | 'apply' | 'history' | 'employees' | 'settings' | '404') => {
-    if (!currentUser && newTab !== '404') {
-      alert('로그인이 필요한 서비스입니다.');
-      setScreen('login');
-      window.location.hash = '';
-      return;
-    }
-    if (currentUser && currentUser.role !== 'admin' && (newTab === 'employees' || newTab === 'settings')) {
-      alert('관리자 전용 페이지입니다. 접근 권한이 없습니다.');
-      setTabState('dashboard');
-      window.location.hash = 'dashboard';
-      return;
-    }
-    setTabState(newTab);
-    if (newTab !== '404') window.location.hash = newTab;
-  };
-
-  // URL Hash Sync & Auth/Role Guard
-  useEffect(() => {
-    const handleHashChange = () => {
-      const rawHash = window.location.hash.replace('#', '').trim();
-      if (!rawHash) return;
-
-      const validTabs = ['dashboard', 'apply', 'history', 'employees', 'settings'];
-      if (!currentUser) {
-        alert('로그인이 필요한 서비스입니다.');
-        setScreen('login');
-        window.location.hash = '';
-        return;
-      }
-      if (currentUser.role !== 'admin' && (rawHash === 'employees' || rawHash === 'settings')) {
-        alert('관리자 전용 페이지입니다. 접근 권한이 없습니다.');
-        setTabState('dashboard');
-        window.location.hash = 'dashboard';
-        return;
-      }
-      if (validTabs.includes(rawHash)) {
-        setTabState(rawHash as any);
-      } else {
-        setTabState('404');
-      }
+  const rawSave = useCallback(() => {
+    const e = runV(); if (Object.keys(e).length) { setErr(e); return; }
+    const safeNum = (v: any, fallback = 0) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
     };
-
-    window.addEventListener('hashchange', handleHashChange);
-    if (window.location.hash && currentUser) handleHashChange();
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [currentUser]);
-
-  const leaveTypes = useMemo(() => {
-    if (!company) return BASE_LEAVE_TYPES;
-    const filteredBase = BASE_LEAVE_TYPES.filter(b => !(company.hidden_base_types || []).includes(b.id))
-      .map(b => {
-        const customLabel = (company.base_type_labels && company.base_type_labels[b.id]) || b.label;
-        return { ...b, label: customLabel };
-      });
-    const gen = (company.general_types || []).map(g => ({ id: g.id, label: g.label, color: '#059669', bg: '#ECFDF5', exempt: false, custom: 'general' }));
-    const fam = (company.family_types || []).map(f => ({ id: f.id, label: f.label, color: '#B45309', bg: '#FFFBEB', exempt: true, custom: 'family' }));
-    return [...filteredBase, ...gen, ...fam];
-  }, [company]);
-
-  // 관리자 전용: 회사설정에서 비활성화된 타입 포함 전체 휴가 타입 목록
-  // 기존 내역 표시 및 관리자 수정 드롭다운에 사용 (설정 변경 후에도 과거 내역 정상 표시)
-  const allLeaveTypes = useMemo(() => {
-    if (!company) return BASE_LEAVE_TYPES.map(b => ({ ...b, isHidden: false }));
-    const hiddenIds = company.hidden_base_types || [];
-    const allBase = BASE_LEAVE_TYPES.map(b => {
-      const customLabel = (company.base_type_labels && company.base_type_labels[b.id]) || b.label;
-      return { ...b, label: customLabel, isHidden: hiddenIds.includes(b.id) };
+    onSave({
+      ...f,
+      code: (f.code ?? "").trim().toUpperCase(),
+      name: (f.name ?? "").trim(),
+      unit: (f.unit ?? "").trim(),
+      location: (f.location ?? "").trim(),
+      qty: safeNum(f.qty),
+      minQty: safeNum(f.minQty, 10),
+      price: Number.isFinite(Number(f.price)) && Number(f.price) >= 0 ? Math.round(Number(f.price)) : 0,
     });
-    const gen = (company.general_types || []).map(g => ({ id: g.id, label: g.label, color: '#059669', bg: '#ECFDF5', exempt: false, custom: 'general', isHidden: false }));
-    const fam = (company.family_types || []).map(f => ({ id: f.id, label: f.label, color: '#B45309', bg: '#FFFBEB', exempt: true, custom: 'family', isHidden: false }));
-    return [...allBase, ...gen, ...fam];
-  }, [company]);
+  }, [f, runV, onSave]);
+  const save = useThrottle(rawSave, 600);
 
-  // bypassCache=false: 캐시 우선 사용 (0ms 렌더링), showSpinner=false: 백그라운드 갱신
-  const loadAppData = async (bypassCache = false, showSpinner = false) => {
-    if (showSpinner) setDataLoading(true);
-    try {
-      const [compData, empsData, leavesData] = await Promise.all([
-        companyAPI.getCompany(bypassCache),
-        employeeAPI.getEmployees(bypassCache),
-        leaveAPI.getLeaves(bypassCache)
-      ]);
-      setCompany(compData);
-      setEmployees(empsData);
+  return (
+    <Modal title={isEdit ? "상품 정보 수정" : "신규 상품 등록"} onClose={onClose}>
+      <Input label="상품/자산 코드" value={f.code ?? ""} onChange={(e: any) => set("code", e.target.value)} error={err.code} disabled={isEdit} placeholder="PRD-001" autoCapitalize="characters" />
+      <Input label="상품명" value={f.name ?? ""} onChange={(e: any) => set("name", e.target.value)} error={err.name} placeholder="예: 멸균 주사기 5ml" />
+      <Sel label="카테고리" value={f.category ?? CATS[0]} onChange={(e: any) => set("category", e.target.value)}>
+        {CATS.map((c) => <option key={c}>{c}</option>)}
+      </Sel>
+      <Input label="원내 보관 위치" value={f.location ?? ""} onChange={(e: any) => set("location", e.target.value)} placeholder="예: A-01-02 (선반위치)" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <NumInput label="현재 수량" value={f.qty ?? 0} onChange={(e: any) => set("qty", e.target.value)} error={err.qty} />
+        <NumInput label="최소수량(경고기준)" value={f.minQty ?? 10} onChange={(e: any) => set("minQty", e.target.value)} error={err.minQty} />
+        <Input label="단위" value={f.unit ?? "개"} onChange={(e: any) => set("unit", e.target.value)} error={err.unit} placeholder="개, 박스, 팩" />
+        <NumInput label="단가 (원)" value={f.price ?? 0} onChange={(e: any) => set("price", e.target.value)} error={err.price} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <Btn variant="ghost" full onPointerDown={onClose}>취소</Btn>
+        <Btn full onPointerDown={save}>{isEdit ? "수정 완료" : "등록"}</Btn>
+      </div>
+    </Modal>
+  );
+}
 
-      // Self-healing: Auto-reject pending leaves of resigned or deleted employees
-      const pendingToReject = leavesData.filter(l => {
-        if (l.status !== 'pending') return false;
-        const emp = empsData.find(e => e.id === l.emp_id);
-        return !emp || emp.status === 'resigned';
-      });
+const PRow = memo(function PRow({ p, isAdmin, onEdit, onDelete, onShowLabel }: any) {
+  const low = (p.qty ?? 0) <= (p.minQty ?? 0);
+  return (
+    <Card accent={low ? T.red : T.green} style={{ marginBottom: 8 }}>
+      <div style={{ ...ROW, gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...ROW, marginBottom: 2 }}>
+            <span style={{ fontWeight: 800, fontSize: 14, color: T.text }}>{p.name ?? "-"}</span>
+            <Badge color={low ? T.red : T.green}>{low ? "부족" : "정상"}</Badge>
+          </div>
+          <span style={{ fontSize: 11, color: T.muted }}>
+            코드: <b>{p.code ?? ""}</b> · {p.category ?? ""} · 위치: {p.location || "미지정"}
+          </span>
+          <div style={{ marginTop: 4, fontSize: 12, color: T.sub }}>
+            재고량: <b style={{ color: T.text, fontSize: 13 }}>{p.qty ?? 0} {p.unit ?? ""}</b>
+            <span style={{ margin: "0 6px", color: T.bdr }}>|</span>
+            {(p.price ?? 0).toLocaleString()}원
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
+          <Btn variant="ghost" size="sm" onPointerDown={() => onShowLabel(p)}>🏷️ 라벨</Btn>
+          {isAdmin && (
+            <>
+              <Btn variant="ghost" size="sm" onPointerDown={() => onEdit(p)}>수정</Btn>
+              <Btn variant="danger" size="sm" onPointerDown={() => onDelete(p.id)}>삭제</Btn>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+});
+PRow.displayName = "PRow";
 
-      if (pendingToReject.length > 0) {
-        // ✅ 최적화: for loop 순차 처리 → Promise.allSettled 병렬 처리
-        await Promise.allSettled(
-          pendingToReject.map(leave =>
-            leaveAPI.updateLeaveStatus(leave.id, 'rejected').catch(e =>
-              console.error('Failed to auto-reject leave:', e)
-            )
-          )
-        );
-        // ✅ 최적화: 재API 호출 없이 state에서 직접 반영 (API roundtrip 1회 절약)
-        setLeaves(leavesData.map(l =>
-          pendingToReject.some(r => r.id === l.id) ? { ...l, status: 'rejected' as const } : l
-        ));
-      } else {
-        setLeaves(leavesData);
-      }
-    } catch (err) {
-      console.error('Error loading app data:', err);
-    } finally {
-      if (showSpinner) setDataLoading(false);
-    }
-  };
+const ProductsView = memo(function ProductsView({ products, company, dispatch, isAdmin, pageSize }: any) {
+  const ready = useReady(SKEL_MS.PRODUCTS);
+  const [search, setSearch] = useState("");
+  const [cat, setCat] = useState("전체");
+  const [modal, setModal] = useState<any>(null);
+  const [labelModal, setLabelModal] = useState<any>(null);
+  const [delId, setDelId] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [, startTx] = useTransition();
 
-  // Check initial login state
+  const codes = useMemo(() => (products ?? []).map((p: any) => p.code), [products]);
+  const filtered = useMemo(() => (products ?? []).filter((p: any) =>
+    (cat === "전체" || p.category === cat) &&
+    ((p.name ?? "").includes(search) || (p.code ?? "").includes(search.toUpperCase()) || (p.location ?? "").includes(search))
+  ), [products, search, cat]);
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize]);
+
+  const onSearch = useCallback((v: string) => { startTx(() => { setSearch(v); setPage(1); }); }, []);
+  const onCat = useCallback((v: string) => { startTx(() => { setCat(v); setPage(1); }); }, []);
+
+  const save = useCallback((data: any) => {
+    dispatch({ type: modal?.id ? "UPDATE" : "ADD", payload: modal?.id ? { ...modal, ...data } : data });
+    setModal(null);
+  }, [modal, dispatch]);
+
+  const rawDel = useCallback(() => { dispatch({ type: "DELETE", id: delId }); setDelId(null); }, [delId, dispatch]);
+  const doDel = useThrottle(rawDel, 600);
+
+  return (
+    <div>
+      <div style={{ ...ROW, marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 800 }}>원내 등록 상품{" "}
+          <span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>({filtered.length}개)</span>
+        </span>
+        {isAdmin && <Btn size="sm" onPointerDown={() => setModal({})}>+ 상품 등록</Btn>}
+      </div>
+
+      <div style={{ background: T.sur, borderRadius: T.r, padding: "11px 13px", marginBottom: 10, boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <input
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder="상품명, 코드, 위치 검색"
+          style={{ ...INP, border: `1.5px solid ${T.bdr}`, marginBottom: 10 }}
+        />
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch" }}>
+          {["전체", ...CATS].map((c) => (
+            <button
+              key={c}
+              onPointerDown={() => onCat(c)}
+              style={{
+                border: "none", borderRadius: 99, padding: "6px 13px", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", touchAction: "manipulation", minHeight: 34, whiteSpace: "nowrap",
+                background: cat === c ? T.text : T.bg, color: cat === c ? "#fff" : T.sub
+              }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!ready ? (
+        Array.from({ length: 4 }).map((_, i) => <SkelCard key={i} rows={3} />)
+      ) : paged.length === 0 ? (
+        <Card><p style={{ margin: 0, textAlign: "center", color: T.muted, fontSize: 13 }}>검색 결과가 없습니다.</p></Card>
+      ) : (
+        paged.map((p: any) => <PRow key={p.id} p={p} isAdmin={isAdmin} onEdit={setModal} onDelete={setDelId} onShowLabel={setLabelModal} />)
+      )}
+
+      <Pagination page={page} total={filtered.length} pageSize={pageSize} onChange={setPage} />
+
+      {modal !== null && <ProductModal initial={modal && Object.keys(modal).length > 0 ? modal : null} onSave={save} onClose={() => setModal(null)} codes={codes} />}
+      {labelModal !== null && <LabelModal product={labelModal} company={company} onClose={() => setLabelModal(null)} />}
+      {delId !== null && (
+        <Modal title="상품 삭제 확인" onClose={() => setDelId(null)}>
+          <p style={{ fontSize: 14, color: T.sub, marginBottom: 18 }}>이 상품을 삭제하시겠습니까? 관련 이력은 유지됩니다.</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="ghost" full onPointerDown={() => setDelId(null)}>취소</Btn>
+            <Btn variant="danger" full onPointerDown={doDel}>삭제</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+});
+ProductsView.displayName = "ProductsView";
+
+// ═══════════════════════════════════════════════════════════════
+// 13. 바코드 & QR 코드 스캔 뷰 (카메라 통합)
+// ═══════════════════════════════════════════════════════════════
+function getCamErr(err: any) {
+  const n = err?.name ?? "";
+  if (n === "NotAllowedError" || n === "PermissionDeniedError") return { msg: "카메라 접근 권한이 거부되었습니다.", guide: true };
+  if (n === "NotFoundError" || n === "DevicesNotFoundError") return { msg: "사용 가능한 카메라 장치를 찾을 수 없습니다.", guide: false };
+  if (n === "NotReadableError" || n === "TrackStartError") return { msg: "카메라가 다른 앱에서 사용 중입니다. 다른 앱을 닫고 다시 시도해 주세요.", guide: false };
+  return { msg: "카메라를 시작할 수 없습니다. HTTPS 환경인지 확인하세요.", guide: false };
+}
+
+function PermGuide({ ios }: { ios: boolean }) {
+  const steps = ios
+    ? ["iPhone/iPad 설정 앱 열기", "Safari 또는 Chrome 선택", "카메라 항목 → '허용' 선택", "페이지 새로고침 후 다시 시도"]
+    : ["Chrome 주소창 왼쪽 자물쇠(🔒) 아이콘 탭", "사이트 설정 → 카메라 → '허용' 선택", "페이지 새로고침 후 다시 시도"];
+  return (
+    <div style={{ background: "#fff8e1", border: "1.5px solid #ffc107", borderRadius: 10, padding: "13px 15px", marginBottom: 12 }}>
+      <p style={{ margin: "0 0 8px", fontWeight: 800, fontSize: 13, color: "#7c5700" }}>📵 모바일 카메라 권한 허용 안내</p>
+      {steps.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 12, color: "#7c5700" }}>{i + 1}. {s}</p>)}
+    </div>
+  );
+}
+
+function ScanView({ products, company, prdDispatch, histDispatch, user }: any) {
+  const device = useDeviceInfo();
+  const [mode, setMode] = useState<any>(null);
+  const [camState, setCamState] = useState("idle");
+  const [errInfo, setErrInfo] = useState<any>(null);
+  const [manCode, setManCode] = useState("");
+  const [found, setFound] = useState<any>(null);
+  const [qty, setQty] = useState("1");
+  const [dept, setDept] = useState(() => user?.department || company?.departments?.[0] || "간호부");
+  const [note, setNote] = useState("");
+  const [qtyErr, setQtyErr] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  const [toast, setToast] = useState<any>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null), streamRef = useRef<any>(null), rafRef = useRef<any>(null);
+  const cvRef = useRef<HTMLCanvasElement>(null), jsqrRef = useRef<any>(null), toastTRef = useRef<any>(null);
+
+  useEffect(() => { cvRef.current = document.createElement("canvas"); }, []);
+
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const authInfo = await authAPI.me();
-        if (authInfo.logged_in && authInfo.user) {
-          if (authInfo.user.status === 'pending') {
-            await authAPI.logout();
-            const list = await authAPI.listCompanies();
-            setCompaniesList(list);
-            setLoading(false);
-            alert('가입 승인 대기 중인 계정입니다.\n회사 인사 관리자의 가입 승인 완료 후 로그인할 수 있습니다.');
-            return;
-          }
-          setCurrentUser(authInfo.user);
-          setScreen('app');
-          setDataLoading(true);
-          setLoading(false);
-          
-          // ✅ 최적화: 재방문 시 캐시 우선 사용 (bypassCache=false)
-          const [compData, empsData, leavesData] = await Promise.all([
-            companyAPI.getCompany(false),
-            employeeAPI.getEmployees(false),
-            leaveAPI.getLeaves(false)
-          ]);
-          setCompany(compData);
-          setEmployees(empsData);
-          setLeaves(leavesData);
-        } else {
-          // Load company list for registration options
-          const list = await authAPI.listCompanies();
-          setCompaniesList(list);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Auth initialization failed:', err);
-        setLoading(false);
-      } finally {
-        setDataLoading(false);
-      }
-    };
-    initAuth();
+    if ((window as any).jsQR) { jsqrRef.current = (window as any).jsQR; return; }
+    if (document.getElementById(JSQR_ID)) return;
+    const s = document.createElement("script");
+    s.id = JSQR_ID; s.src = JSQR_SRC; s.crossOrigin = "anonymous";
+    s.onload = () => { jsqrRef.current = (window as any).jsQR ?? null; };
+    s.onerror = () => setErrInfo({ msg: "스캐너 디코더 라이브러리를 로드하지 못했습니다.", guide: false });
+    document.head.appendChild(s);
   }, []);
 
-  const login = async (email: string, password?: string) => {
-    setLoading(true);
-    try {
-      const res = await authAPI.login(email, password);
-      if (res.success && res.user) {
-        if (res.user.status === 'pending') {
-          await authAPI.logout();
-          alert('가입 승인 대기 중인 계정입니다.\n회사 인사 관리자의 가입 승인 완료 후 로그인하실 수 있습니다.');
-          setLoading(false);
-          return;
+  const stopCamera = useCallback(() => {
+    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    streamRef.current?.getTracks().forEach((t: any) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCamState("idle");
+  }, []);
+
+  useEffect(() => () => {
+    stopCamera();
+    if (toastTRef.current) clearTimeout(toastTRef.current);
+  }, [stopCamera]);
+
+  const showToast = useCallback((msg: string, color?: string) => {
+    if (toastTRef.current) clearTimeout(toastTRef.current);
+    setToast({ msg, color });
+    toastTRef.current = setTimeout(() => { setToast(null); toastTRef.current = null; }, TOAST_MS);
+  }, []);
+
+  const handleFound = useCallback((code: string) => {
+    const upper = (code ?? "").trim().toUpperCase();
+    if (!upper) return;
+    const p = (products ?? []).find((x: any) => x.code === upper);
+    if (p) { setFound(p); setQty("1"); setQtyErr(""); setErrInfo(null); }
+    else setErrInfo({ msg: `"${upper}" 코드에 해당하는 원내 제품을 찾을 수 없습니다.`, guide: false });
+  }, [products]);
+
+  const startCamera = useCallback(async () => {
+    if (!device.secure) { setErrInfo({ msg: "카메라 스캔은 HTTPS 환경에서 사용할 수 있습니다.", guide: false }); setCamState("error"); return; }
+    if (!device.hasMedia) { setErrInfo({ msg: "이 브라우저는 카메라를 지원하지 않습니다.", guide: false }); setCamState("error"); return; }
+    setCamState("requesting"); setErrInfo(null); setFound(null);
+
+    const withTO = (p: Promise<any>) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new DOMException("Timeout", "AbortError")), 10000))]);
+    const constraints = [
+      { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+      { video: { facingMode: "environment" } }, { video: true },
+    ];
+    let stream: any = null, lastErr: any = null;
+    for (const c of constraints) {
+      try { stream = await withTO(navigator.mediaDevices.getUserMedia(c)); break; }
+      catch (e: any) { lastErr = e; if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") break; }
+    }
+    if (!stream) { setErrInfo(getCamErr(lastErr)); setCamState("error"); return; }
+
+    streamRef.current?.getTracks().forEach((t: any) => t.stop());
+    streamRef.current = stream;
+    const video = videoRef.current;
+    if (video) {
+      video.srcObject = stream;
+      video.onloadedmetadata = async () => { try { await video.play(); } catch { } };
+      try { await video.play(); } catch { }
+    }
+    setCamState("active");
+
+    rafRef.current = -1;
+    const tick = () => {
+      if (rafRef.current === null) return;
+      const v = videoRef.current, cv = cvRef.current;
+      if (!v || !cv || v.readyState < 2) { rafRef.current = requestAnimationFrame(tick); return; }
+      if (cv.width !== v.videoWidth || cv.height !== v.videoHeight) { cv.width = v.videoWidth; cv.height = v.videoHeight; }
+      if (cv.width === 0 || cv.height === 0) { rafRef.current = requestAnimationFrame(tick); return; }
+
+      try {
+        const ctx = cv.getContext("2d", { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(v, 0, 0);
+          const img = ctx.getImageData(0, 0, cv.width, cv.height);
+
+          // 1D 바코드 디코딩 시도 (BarcodeDetector API 지원 시)
+          if ((window as any).BarcodeDetector) {
+            const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "ean_13", "code_128", "code_39"] });
+            detector.detect(v).then((barcodes: any[]) => {
+              if (barcodes && barcodes.length > 0) {
+                stopCamera();
+                handleFound(barcodes[0].rawValue);
+                return;
+              }
+            }).catch(() => { });
+          }
+
+          // 2D QR 코드 디코딩 (jsQR)
+          const qr = jsqrRef.current?.(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+          if (qr?.data) { stopCamera(); handleFound(qr.data); return; }
+
+          // 1D 바코드 스캔라인 fallback 디코딩 시도
+          const code1D = decode1DBarcodePattern(img);
+          if (code1D) { stopCamera(); handleFound(code1D); return; }
         }
-        setCurrentUser(res.user);
-        setScreen('app');
-        setTab('dashboard');
-        setDataLoading(true);
-        setLoading(false);
-        
-        // ✅ 최적화: 로그인 직후는 항상 최신 데이터 강제 패치 (bypassCache=true)
-        const [compData, empsData, leavesData] = await Promise.all([
-          companyAPI.getCompany(true),
-          employeeAPI.getEmployees(true),
-          leaveAPI.getLeaves(true)
-        ]);
-        setCompany(compData);
-        setEmployees(empsData);
-        setLeaves(leavesData);
+      } catch { }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [device, stopCamera, handleFound]);
+
+  const manSearch = useCallback(() => {
+    const code = (manCode ?? "").trim().toUpperCase();
+    if (!code) { setErrInfo({ msg: "상품 코드를 입력해 주세요.", guide: false }); return; }
+    handleFound(code);
+  }, [manCode, handleFound]);
+
+  const openConfirm = useCallback(() => {
+    if (!found) { setErrInfo({ msg: "상품 정보를 다시 확인해 주세요.", guide: false }); return; }
+    const qe = V.posInt(qty); if (qe) { setQtyErr(qe); return; }
+    const n = Number(qty);
+    if (n === 0) { setQtyErr("1 이상의 수량을 입력해 주세요."); return; }
+    if (mode === "out" && n > (found.qty ?? 0)) {
+      setQtyErr(`현재 재고 수량(${found.qty}${found.unit ?? ""})을 초과할 수 없습니다.`); return;
+    }
+    setQtyErr(""); setConfirm(true);
+  }, [qty, found, mode]);
+
+  const rawCommit = useCallback((addMore: boolean) => {
+    if (!found || !mode) return;
+    const n = Math.floor(Number(qty));
+    if (!Number.isFinite(n) || n <= 0) return;
+    prdDispatch({ type: "ADJ", id: found.id, delta: mode === "in" ? n : -n });
+    histDispatch({
+      type: "ADD",
+      payload: {
+        productCode: found.code,
+        productName: found.name,
+        type: mode === "in" ? "입고" : mode === "out" ? "출고" : "실사조정",
+        qty: n,
+        department: dept,
+        by: user?.name ?? "담당자",
+        date: today(),
+        note: note.trim() || (mode === "in" ? "스캔 입고" : "스캔 출고"),
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || '로그인에 실패했습니다.');
-      setLoading(false);
-    } finally {
-      setDataLoading(false);
-    }
-  };
+    });
+    setConfirm(false); setFound(null); setManCode(""); setErrInfo(null); setNote("");
+    showToast(`${found.name} ${mode === "in" ? "입고" : "출고"} (${n}${found.unit}) 완료`, mode === "in" ? T.green : T.red);
+    if (addMore) startCamera();
+  }, [qty, found, mode, dept, note, prdDispatch, histDispatch, user, showToast, startCamera]);
+  const commit = useThrottle(rawCommit, 800);
 
-  const logout = async () => {
-    try {
-      await authAPI.logout();
-      setCurrentUser(null);
-      setCompany(null);
-      setEmployees([]);
-      setLeaves([]);
-      setScreen('login');
-      window.location.hash = '';
-      const list = await authAPI.listCompanies();
-      setCompaniesList(list);
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-  };
+  const resetScan = useCallback(() => { setMode(null); stopCamera(); setFound(null); setErrInfo(null); setManCode(""); setQtyErr(""); }, [stopCamera]);
 
-  const register = async (regData: any) => {
-    try {
-      const res = await authAPI.register(regData);
-      if (res.success) {
-        if (regData.newCompanyName) {
-          alert('신규 회사가 성공적으로 등록되었습니다!\n생성하신 관리자 계정으로 로그인해주세요.');
-        } else {
-          alert('회원가입 신청이 완료되었습니다!\n회사 관리자의 가입 승인 완료 후 로그인하실 수 있습니다.');
-        }
-        // Refresh companies list
-        const list = await authAPI.listCompanies();
-        setCompaniesList(list);
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || '회원가입에 실패했습니다.');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f6f8fc' }}>
-        <div className="animate-scale" style={{ textAlign: 'center' }}>
-          <div style={{ width: 64, height: 64, borderRadius: 16, background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#fff', fontSize: 28, fontWeight: 'bold', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3)' }}>✦</div>
-          <div style={{ fontWeight: 600, fontSize: 18, color: '#111827' }}>데이터를 불러오는 중...</div>
-          <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>잠시만 기다려주세요.</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (screen === 'login') {
-    return <LoginScreen companies={companiesList} onLogin={login} onRegister={register} />;
-  }
-
-  const isAdmin = currentUser?.role === 'admin';
-
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header user={currentUser} company={company} onLogout={logout} />
-      <NavBar tab={tab} setTab={setTab} isAdmin={isAdmin} />
-      <main style={{ flex: 1, maxWidth: 1200, width: '100%', margin: '0 auto', padding: '2rem 1.5rem' }} className="animate-fade">
-        {dataLoading ? (
-          <>
-            {tab === 'dashboard' && <DashboardSkeleton isAdmin={isAdmin} />}
-            {tab === 'apply' && <FormSkeleton />}
-            {tab === 'history' && <TableSkeleton cols={isAdmin ? 7 : 6} />}
-            {tab === 'employees' && <TableSkeleton cols={5} />}
-            {tab === 'settings' && <TableSkeleton cols={3} rows={8} />}
-          </>
-        ) : (
-          <>
-            {tab === 'dashboard' && <Dashboard currentUser={currentUser!} employees={employees} leaves={leaves} company={company!} leaveTypes={leaveTypes} isAdmin={isAdmin} />}
-            {tab === 'apply' && <ApplyLeave currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} onApply={loadAppData} />}
-            {tab === 'history' && <LeaveHistory currentUser={currentUser!} leaves={leaves} employees={employees} leaveTypes={leaveTypes} allLeaveTypes={allLeaveTypes} isAdmin={isAdmin} onApprove={loadAppData} />}
-            {tab === 'employees' && isAdmin && <EmployeeMgmt employees={employees} currentUser={currentUser!} leaves={leaves} company={company!} leaveTypes={leaveTypes} allLeaveTypes={allLeaveTypes} onUpdate={loadAppData} />}
-            {tab === 'settings' && isAdmin && <CompanySettings company={company!} employees={employees} currentUser={currentUser!} onSave={loadAppData} />}
-            {tab === '404' && <NotFoundScreen onGoHome={() => setTab('dashboard')} />}
-          </>
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ---------- Header ----------
-function Header({ user, company, onLogout }: { user: Employee | null; company: Company | null; onLogout: () => void }) {
-  return (
-    <header className="glass-nav" style={{ padding: '0 1.5rem', position: 'sticky', top: 0, zIndex: 50 }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.25)' }}>
-            <span style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>✦</span>
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--gray-900)' }}>{company?.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--gray-500)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Building size={10} /> ID: {company?.id}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: 600, fontSize: 12 }}>
-              {user?.name[0]}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>{user?.name}</div>
-              <div style={{ fontSize: 10, color: 'var(--gray-500)', display: 'flex', alignItems: 'center', gap: 2 }}>
-                {user?.role === 'admin' ? <Shield size={10} style={{ color: 'var(--primary)' }} /> : null}
-                {user?.role === 'admin' ? '관리자' : '직원'}
-              </div>
-            </div>
-          </div>
-          <button className="btn btn-ghost" onClick={onLogout} style={{ padding: '6px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <LogOut size={14} /> 로그아웃
+  if (!mode) return (
+    <div>
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
+      <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>바코드 & QR 스캔 처리</p>
+      <p style={{ fontSize: 13, color: T.muted, marginBottom: 20 }}>입고 또는 출고 작업을 선택해 주세요.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {[
+          ["in", "📥", "입고 처리", T.green, "원내 중앙 입고 등록"],
+          ["out", "📤", "출고 처리", T.red, "부서별 제품 출고"],
+        ].map(([m, ic, lb, cl, desc]) => (
+          <button
+            key={m}
+            onPointerDown={() => setMode(m)}
+            style={{
+              border: `1.5px solid ${cl}30`, borderRadius: 14, padding: "26px 12px",
+              background: `${cl}0d`, display: "flex", flexDirection: "column",
+              alignItems: "center", gap: 8, cursor: "pointer", touchAction: "manipulation", minHeight: 140
+            }}>
+            <span style={{ fontSize: 38 }}>{ic}</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: cl }}>{lb}</span>
+            <span style={{ fontSize: 11, color: T.muted }}>{desc}</span>
           </button>
-        </div>
+        ))}
       </div>
-    </header>
+    </div>
   );
-}
-
-// ---------- NavBar ----------
-function NavBar({ tab, setTab, isAdmin }: { tab: string; setTab: (t: any) => void; isAdmin: boolean }) {
-  const tabs = [
-    { id: 'dashboard', label: '대시보드', icon: CalendarIcon },
-    { id: 'apply', label: '휴가 신청', icon: Plus },
-    { id: 'history', label: isAdmin ? '신청/승인 관리' : '사용 내역', icon: FileText },
-    ...(isAdmin ? [
-      { id: 'employees', label: '직원 관리', icon: Users },
-      { id: 'settings', label: '회사 설정', icon: Settings }
-    ] : []),
-  ];
-  return (
-    <nav style={{ background: '#fff', borderBottom: '1px solid var(--gray-200)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', overflowX: 'auto', padding: '0 0.75rem' }}>
-        {tabs.map(t => {
-          const Icon = t.icon;
-          const isActive = tab === t.id;
-          return (
-            <button 
-              key={t.id} 
-              onClick={() => setTab(t.id)} 
-              style={{ 
-                padding: '16px 20px', 
-                fontSize: 14, 
-                fontWeight: isActive ? 600 : 500, 
-                color: isActive ? 'var(--primary)' : 'var(--gray-500)', 
-                background: 'transparent', 
-                border: 'none', 
-                borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent', 
-                cursor: 'pointer', 
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Icon size={16} style={{ color: isActive ? 'var(--primary)' : 'var(--gray-400)' }} />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-// ---------- Dashboard ----------
-function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmin }: { 
-  currentUser: Employee; 
-  employees: Employee[]; 
-  leaves: Leave[]; 
-  company: Company; 
-  leaveTypes: any[]; 
-  isAdmin: boolean;
-}) {
-  const today = new Date();
-  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-
-  const companyEmployees = useMemo(() =>
-    employees.filter(e => e.company_id === currentUser.company_id),
-  [employees, currentUser]);
-
-  const visibleEmps = useMemo(() => {
-    const myCard = employees.find(e => e.id === currentUser.id);
-    if (!isAdmin) {
-      return myCard ? [myCard] : [];
-    }
-    
-    const cards = [];
-    if (myCard) cards.push(myCard);
-    
-    const otherLeaves = leaves.filter(l => l.emp_id !== currentUser.id && companyEmployees.some(e => e.id === l.emp_id));
-    const sortedOtherLeaves = [...otherLeaves].sort((a, b) => b.start_date.localeCompare(a.start_date) || b.id.localeCompare(a.id));
-    const recentLeave = sortedOtherLeaves[0];
-    
-    if (recentLeave) {
-      const recentEmp = companyEmployees.find(e => e.id === recentLeave.emp_id);
-      if (recentEmp && recentEmp.id !== currentUser.id) {
-        cards.push(recentEmp);
-      }
-    }
-    return cards;
-  }, [employees, currentUser, isAdmin, leaves, companyEmployees]);
-
-  const monthCells = useMemo(() => {
-    const y = viewDate.getFullYear(), m = viewDate.getMonth();
-    const first = new Date(y, m, 1);
-    // Find the Monday of the week containing first day of month
-    const firstDayOfWeek = first.getDay(); // Sunday = 0, Monday = 1...
-    const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Days from Monday
-    const start = new Date(y, m, 1 - startOffset);
-    return Array.from({ length: 35 }, (_, i) => {
-      const d = new Date(start); 
-      d.setDate(start.getDate() + i); 
-      return d;
-    });
-  }, [viewDate]);
-
-  const allLeaves = useMemo(() =>
-    leaves.filter(l => companyEmployees.some(e => e.id === l.emp_id) && l.status === 'approved'),
-  [leaves, companyEmployees]);
-
-  const leavesByDay = useMemo(() => {
-    const map: Record<string, Leave[]> = {};
-    allLeaves.forEach(l => {
-      const startStr = formatDateStr(l.start_date);
-      const endStr = formatDateStr(l.end_date);
-      let d = parseLocalDate(startStr);
-      const end = parseLocalDate(endStr);
-      while (d <= end) {
-        const ds = formatLocalDate(d);
-        (map[ds] = map[ds] || []).push(l);
-        d.setDate(d.getDate() + 1);
-      }
-    });
-    return map;
-  }, [allLeaves]);
-
-  const recentApprovedLeaves = useMemo(() => {
-    return [...allLeaves].sort((a, b) => (b.start_date || '').localeCompare(a.start_date || '')).slice(0, 10);
-  }, [allLeaves]);
-
-  const EMP_COLORS = ['#4F46E5', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2'];
-  const isOnLOA = (emp: Employee) => {
-    if (!emp.leave_of_absence) return false;
-    const start = emp.leave_of_absence.start;
-    const end = emp.leave_of_absence.end;
-    const current = todayStr();
-    return start <= current && (!end || end >= current);
-  };
-
-  const getBasisLabel = (type: string, date: string) => {
-    if (type === 'join') return '입사일 기준';
-    if (type === 'fiscal') return '회계연도 기준(1월 1일)';
-    return `지정일 기준(${date})`;
-  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {isAdmin && leaves.some(l => l.status === 'pending' && l.reason?.includes('한도초과') && companyEmployees.some(e => e.id === l.emp_id)) && (
-        <div className="glass-card animate-scale" style={{ background: '#FFFBEB', borderLeft: '4px solid #D97706', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #FDE68A' }}>
-          <ShieldAlert size={20} style={{ color: '#D97706', flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>⚠️ 연차 보유 한도 초과 신청 감지</div>
-            <div style={{ fontSize: 12, color: '#B45309', marginTop: 2 }}>
-              소속 직원이 연차 한도를 초과하여 신청한 휴가 결재 대기 건이 존재합니다. <strong>[신청/결재 관리]</strong> 탭에서 사유를 확인하고 결재해 주십시오.
-            </div>
-          </div>
+    <div>
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
+      <div style={{ ...ROW, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Btn variant="ghost" size="sm" onPointerDown={resetScan}>← 이전</Btn>
+          <span style={{ fontSize: 16, fontWeight: 800 }}>{mode === "in" ? "📥 모바일 입고" : "📤 모바일 출고"}</span>
         </div>
-      )}
-      {isAdmin && companyEmployees.some(e => e.status === 'pending') && (
-        <div className="glass-card animate-scale" style={{ background: '#EFF6FF', borderLeft: '4px solid #3B82F6', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #BFDBFE' }}>
-          <UserPlus size={20} style={{ color: '#2563EB', flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1E40AF' }}>🔔 신규 직원 회원가입 승인 대기 건 존재</div>
-            <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 2 }}>
-              신규 회원가입을 신청한 직원이 <strong>{companyEmployees.filter(e => e.status === 'pending').length}명</strong> 있습니다. <strong>[직원 관리]</strong> 탭에서 가입 승인 처리해 주십시오.
-            </div>
-          </div>
-        </div>
-      )}
-      {isAdmin && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-          {[
-            { label: '전체 관리 직원', value: companyEmployees.filter(e => e.status !== 'pending').length + '명', icon: Users, color: 'var(--primary)' },
-            { label: '재직 직원', value: companyEmployees.filter(e => e.status === 'active').length + '명', icon: Briefcase, color: 'var(--success)' },
-            { label: '이번 달 승인 휴가', value: leaves.filter(l => {
-              const d = new Date(l.start_date);
-              return companyEmployees.some(e => e.id === l.emp_id) && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear() && l.status === 'approved';
-            }).length + '건', icon: CalendarIcon, color: 'var(--warning)' },
-            { label: '승인 대기 건수', value: leaves.filter(l => companyEmployees.some(e => e.id === l.emp_id) && l.status === 'pending').length + '건', icon: Clock, color: 'var(--danger)' },
-          ].map((m, i) => (
-            <div key={i} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem' }}>
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 600, marginBottom: 6 }}>{m.label}</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gray-900)' }}>{m.value}</div>
-              </div>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: m.color + '12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <m.icon size={22} style={{ color: m.color }} />
-              </div>
-            </div>
-          ))}
+        <Badge color={mode === "in" ? T.green : T.red}>{mode === "in" ? "입고" : "출고"}</Badge>
+      </div>
+
+      {errInfo?.guide && <PermGuide ios={device.ios} />}
+      {errInfo && !errInfo.guide && (
+        <div style={{ background: "#fff8e1", border: "1px solid #ffc107", borderRadius: 9, padding: "10px 14px", fontSize: 13, color: "#7c5700", fontWeight: 600, marginBottom: 10 }}>
+          ⚠ {errInfo.msg}
         </div>
       )}
 
-      {/* Info Message on calculation standard */}
-      <div className="glass-card" style={{ background: '#fff', borderLeft: '4px solid var(--primary)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <Info size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-        <div style={{ fontSize: 13, color: 'var(--gray-700)' }}>
-          현재 회사의 연차 부여 기준은 <strong>{getBasisLabel(company?.basis_type, company?.basis_date)}</strong>입니다. 이에 따라 연차가 산출됩니다.
-        </div>
-      </div>
+      {!found && (
+        <Card style={{ marginBottom: 12 }}>
+          <div style={{ position: "relative", background: "#0d1117", borderRadius: 12, overflow: "hidden", marginBottom: 12, display: camState === "active" ? "block" : "none" }}>
+            <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: 250, objectFit: "cover", display: "block" }} />
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <div style={{ width: 190, height: 190, border: "2.5px solid rgba(255,255,255,.85)", borderRadius: 16, boxShadow: "0 0 0 9999px rgba(0,0,0,.45)" }} />
+            </div>
+            <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center" }}>
+              <span style={{ fontSize: 11, color: "#fff", background: "rgba(0,0,0,.6)", padding: "4px 12px", borderRadius: 99 }}>
+                바코드 / QR 코드를 사각형 내에 맞춰주세요
+              </span>
+            </div>
+          </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: visibleEmps.length > 1 ? 'repeat(auto-fit, minmax(400px, 1fr))' : '1fr', gap: '1.5rem' }}>
-        {visibleEmps.map((emp) => {
-          // Accurate Korean Labor Standards Act calculation
-          const leaveBalance = getCurrentLeaveBalance(emp.join_date, leaves.filter(l => l.emp_id === emp.id), company?.basis_type, company?.basis_date, new Date(), company?.leave_disposal ?? 'expire');
-          const totalAnnual = leaveBalance.granted;
-          const used = leaveBalance.used;
-          const remaining = leaveBalance.remaining;
-          const pct = totalAnnual > 0 ? Math.round((used / totalAnnual) * 100) : 0;
-          const loa = isOnLOA(emp);
-          const originalIdx = employees.findIndex(e => e.id === emp.id);
-          
-          return (
-            <div key={emp.id} className="glass-card" style={{ opacity: emp.status !== 'active' || loa ? 0.65 : 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: EMP_COLORS[originalIdx % EMP_COLORS.length] + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: EMP_COLORS[originalIdx % EMP_COLORS.length] }}>
-                    {emp.name[0]}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--gray-900)' }}>{emp.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{emp.department || '부서 미지정'}</div>
-                  </div>
-                </div>
-                {emp.status === 'resigned' && <StatusBadge label={`퇴사 ${emp.resign_date || ''}`} color="var(--danger)" bg="var(--danger-light)" />}
-                {loa && <StatusBadge label="휴직 중" color="var(--warning)" bg="var(--warning-light)" />}
-                {!isAdmin && emp.status === 'active' && !loa && <StatusBadge label="본인" color="var(--primary)" bg="var(--primary-light)" />}
+          {camState === "requesting" && (
+            <div style={{ textAlign: "center", padding: "20px 0", color: T.muted, fontSize: 13 }}>
+              📷 카메라 스캐너 초기화 중…
+            </div>
+          )}
+
+          <Btn
+            full
+            size="lg"
+            variant={camState === "active" ? "danger" : "primary"}
+            onPointerDown={camState === "active" ? stopCamera : startCamera}
+            style={{ opacity: camState === "requesting" ? .6 : 1, pointerEvents: camState === "requesting" ? "none" : "auto" }}>
+            {camState === "active" ? "⏹ 스캐너 중지" : camState === "requesting" ? "권한 요청 중…" : "📷 실시간 카메라 스캔 시작"}
+          </Btn>
+
+          <div style={{ ...ROW, margin: "14px 0", gap: 8 }}>
+            <div style={{ flex: 1, height: 1, background: T.bdr }} /><span style={{ fontSize: 11, color: T.muted }}>또는 직접 입력</span><div style={{ flex: 1, height: 1, background: T.bdr }} />
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={manCode}
+              onChange={(e) => { setManCode(e.target.value.toUpperCase()); setErrInfo(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") manSearch(); }}
+              placeholder="예: PRD-001"
+              autoCapitalize="characters"
+              style={{ ...INP, flex: 1, border: `1.5px solid ${T.bdr}` }}
+            />
+            <Btn onPointerDown={manSearch}>검색</Btn>
+          </div>
+        </Card>
+      )}
+
+      {found && (
+        <Card style={{ marginBottom: 12, animation: "fadeUp .2s ease" }}>
+          <div style={{ background: mode === "in" ? `${T.green}0f` : `${T.red}0f`, borderRadius: 9, padding: "12px 14px", marginBottom: 14 }}>
+            <p style={{ margin: "0 0 3px", fontSize: 11, color: T.muted }}>코드: {found.code} · 위치: {found.location || "미지정"}</p>
+            <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 800 }}>{found.name}</p>
+            <p style={{ margin: 0, fontSize: 13, color: T.sub }}>현재 원내 재고량: <b style={{ color: T.text, fontSize: 14 }}>{found.qty} {found.unit}</b></p>
+          </div>
+
+          <NumInput label="입출고 수량" value={qty} onChange={(e: any) => { setQty(e.target.value); setQtyErr(""); }} error={qtyErr} />
+
+          <Sel label="담당 / 처리 부서" value={dept} onChange={(e: any) => setDept(e.target.value)}>
+            {(company?.departments || DEPARTS).map((d: string) => <option key={d}>{d}</option>)}
+          </Sel>
+
+          <Input label="메모 / 사유 (선택)" value={note} onChange={(e: any) => setNote(e.target.value)} placeholder="예: 정기 보충, 진료실 출고 등" />
+
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <Btn variant="ghost" full onPointerDown={() => { setFound(null); setManCode(""); setErrInfo(null); }}>← 재스캔</Btn>
+            <Btn variant={mode === "in" ? "success" : "danger"} full size="lg" onPointerDown={openConfirm}>
+              {mode === "in" ? "입고 완료" : "출고 완료"}
+            </Btn>
+          </div>
+        </Card>
+      )}
+
+      {confirm && found && (
+        <Modal title={mode === "in" ? "입고 최종 확인" : "출고 최종 확인"} onClose={() => setConfirm(false)}>
+          <div style={{ background: T.bg, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+            {[
+              ["품목명", found.name],
+              ["자산코드", found.code],
+              ["처리 부서", dept],
+              ["입출고 수량", `${qty} ${found.unit}`],
+              ["변경 후 예상 재고", `${(found.qty ?? 0) + (mode === "in" ? +qty : -qty)} ${found.unit}`],
+              ["사유", note || "-"],
+            ].map(([k, v], i) => (
+              <div key={k} style={{ ...ROW, padding: "5px 0", borderTop: i ? `1px solid ${T.bdr}` : undefined }}>
+                <span style={{ fontSize: 12, color: T.muted }}>{k}</span><b style={{ fontSize: 13 }}>{v}</b>
               </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--gray-500)', fontWeight: 600, marginBottom: 6 }}>
-                  <span>연차 소진현황 (현재 주기)</span>
-                  <span>{used.toFixed(2)} / {totalAnnual}일 ({pct}%)</span>
-                </div>
-                <div style={{ height: 8, background: 'var(--gray-200)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', background: 'var(--primary)', borderRadius: 4, width: `${Math.min(pct, 100)}%`, transition: 'width 0.4s ease' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                  <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>주기: {leaveBalance.activeCycle?.startDate} ~ {leaveBalance.activeCycle?.endDate}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>잔여 {remaining.toFixed(2)}일</span>
-                </div>
-              </div>
-
-              {/* General Leaves and metadata */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={{ background: '#f8fafc', borderRadius: 'var(--radius-md)', padding: '8px 12px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: 10, color: 'var(--gray-500)', fontWeight: 600, marginBottom: 2 }}>입사일</div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--gray-700)' }}>{formatDateStr(emp.join_date)}</div>
-                </div>
-                {(company?.general_types || []).slice(0, 1).map(gt => {
-                  // Monthly company general leaves (simple count)
-                  const usedG = leaves.filter(l => l.emp_id === emp.id && l.type === gt.id && l.status === 'approved' &&
-                    new Date(l.start_date).getMonth() === today.getMonth() && new Date(l.start_date).getFullYear() === today.getFullYear())
-                    .reduce((sum, l) => sum + l.unit, 0);
-                  const remG = Math.max(0, gt.days - usedG);
-                  return (
-                    <div key={gt.id} style={{ background: 'var(--success-light)', borderRadius: 'var(--radius-md)', padding: '8px 12px', border: '1px solid var(--success-border)40' }}>
-                      <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600, marginBottom: 2 }}>{gt.label} (이번달)</div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--success)' }}>{remG}개 / {gt.days}일 잔여</div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Recent Approved Leaves History Widget */}
-      <div className="glass-card animate-fade">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--gray-900)' }}>최근 승인된 휴가 신청 이력</span>
+            ))}
           </div>
-          <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>최신 승인 내역 {Math.min(recentApprovedLeaves.length, 10)}건</span>
-        </div>
-        
-        {recentApprovedLeaves.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--gray-400)', fontSize: 13 }}>
-            최근 승인된 휴가 신청 이력이 없습니다.
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Btn variant={mode === "in" ? "success" : "danger"} full size="lg" onPointerDown={() => commit(false)}>✅ 확인 완료</Btn>
+            <Btn variant="primary" full size="lg" onPointerDown={() => commit(true)}>📷 확인 후 계속 스캔</Btn>
+            <Btn variant="ghost" full size="lg" onPointerDown={() => setConfirm(false)}>취소</Btn>
           </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 10 }}>
-            {recentApprovedLeaves.map((l, idx) => {
-              const lt = leaveTypes.find(x => x.id === l.type);
-              const label = lt?.label || (l.type === 'am_half' ? '오전반차' : l.type === 'pm_half' ? '오후반차' : l.type === 'annual' ? '연차' : l.type);
-              const empName = l.emp_name || employees.find(e => e.id === l.emp_id)?.name || '직원';
-              const dateRange = formatDateStr(l.start_date) === formatDateStr(l.end_date)
-                ? formatDateStr(l.start_date)
-                : `${formatDateStr(l.start_date)} ~ ${formatDateStr(l.end_date)}`;
-
-              let dotColor = 'var(--primary)';
-              if (lt?.custom === 'family' || l.type.includes('경조') || label.includes('경조')) {
-                dotColor = '#B45309';
-              } else if (lt?.custom === 'general' || l.type.includes('회사') || label.includes('회사')) {
-                dotColor = '#059669';
-              }
-
-              return (
-                <div key={l.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--gray-900)' }}>{empName}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: dotColor, background: `${dotColor}15`, padding: '2px 8px', borderRadius: 10 }}>
-                      {label} ({l.unit}일)
-                    </span>
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--gray-500)' }}>
-                    {dateRange}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Calendar card */}
-      <div className="glass-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CalendarIcon size={18} style={{ color: 'var(--primary)' }} />
-            <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--gray-900)' }}>{viewDate.getFullYear()}년 {viewDate.getMonth() + 1}월 휴가 캘린더</span>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} style={{ padding: '6px 12px' }}>
-              <ChevronLeft size={16} />
-            </button>
-            <button className="btn" onClick={() => setViewDate(new Date(today.getFullYear(), today.getMonth(), 1))} style={{ padding: '6px 12px', fontSize: 12 }}>
-              오늘
-            </button>
-            <button className="btn" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))} style={{ padding: '6px 12px' }}>
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div className="calendar-container">
-          <div className="calendar-inner">
-            <div className="calendar-grid" style={{ marginBottom: 6 }}>
-              {['월','화','수','목','금','토','일'].map(d => (
-                <div key={d} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', padding: '6px 0', borderBottom: '1px solid var(--gray-200)' }}>
-                  {d}
-                </div>
-              ))}
-            </div>
-
-            <div className="calendar-grid">
-              {monthCells.map((d, i) => {
-                const ds = formatLocalDate(d);
-                const isToday = ds === todayStr();
-                const inMonth = d.getMonth() === viewDate.getMonth();
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                const dayLeaves = leavesByDay[ds] || [];
-                
-                return (
-                  <div 
-                    key={ds + i} 
-                    className={`calendar-day ${isToday ? 'today' : ''} ${inMonth ? '' : 'other-month'}`}
-                    style={{ 
-                      background: isToday ? 'var(--primary-light)' : isWeekend ? '#fbfcfe' : '#fff',
-                      border: isToday ? '1.5px solid var(--primary)' : '1px solid var(--gray-100)',
-                      boxShadow: isToday ? '0 4px 12px rgba(79, 70, 229, 0.1)' : 'none'
-                    }}
-                  >
-                    <div style={{ 
-                      fontSize: 12, 
-                      fontWeight: isToday ? 700 : 500, 
-                      color: isToday ? 'var(--primary)' : isWeekend ? 'var(--danger)' : 'var(--gray-700)', 
-                      marginBottom: 6 
-                    }}>
-                      {d.getDate()}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {dayLeaves.slice(0, 3).map((l, li) => {
-                        const lt = leaveTypes.find(x => x.id === l.type);
-                        const labelText = lt?.label || (
-                          l.type === 'pm_half' ? '오후반차' : 
-                          l.type === 'am_half' ? '오전반차' : 
-                          l.type === 'annual' ? '연차' : 
-                          l.type
-                        );
-                        const empName = l.emp_name || employees.find(e => e.id === l.emp_id)?.name || '직원';
-                        
-                        // Categorize colors
-                        let badgeColor = '#4F46E5';
-                        let badgeBg = '#EEF2FF';
-                        if (l.type === 'annual' || l.type === 'am_half' || l.type === 'pm_half') {
-                          badgeColor = '#4F46E5';
-                          badgeBg = '#EEF2FF';
-                        } else if (l.type === 'unearned_annual') {
-                          badgeColor = '#EF4444';
-                          badgeBg = '#FEF2F2';
-                        } else if (l.type === 'unpaid_annual') {
-                          badgeColor = '#6B7280';
-                          badgeBg = '#F3F4F6';
-                        } else if (lt?.custom === 'family' || l.type.includes('경조') || labelText.includes('경조')) {
-                          badgeColor = '#B45309';
-                          badgeBg = '#FFFBEB';
-                        } else {
-                          badgeColor = '#059669';
-                          badgeBg = '#ECFDF5';
-                        }
-
-                        return (
-                          <div 
-                            key={li} 
-                            className="calendar-leave-badge"
-                            title={`${empName} · ${labelText}`}
-                            style={{ 
-                              background: badgeBg, 
-                              color: badgeColor,
-                              borderLeft: `3px solid ${badgeColor}`
-                            }}
-                          >
-                            {empName} ({labelText})
-                          </div>
-                        );
-                      })}
-                      {dayLeaves.length > 3 && (
-                        <div style={{ fontSize: 9, color: 'var(--gray-500)', fontWeight: 600, paddingLeft: 4 }}>
-                          외 {dayLeaves.length - 3}명
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: 16, marginTop: 20, flexWrap: 'wrap', borderTop: '1px solid var(--gray-200)', paddingTop: 16 }}>
-          {[
-            { label: '연차', color: '#4F46E5', bg: '#EEF2FF' },
-            { label: '회사휴가', color: '#059669', bg: '#ECFDF5' },
-            { label: '경조휴가', color: '#B45309', bg: '#FFFBEB' }
-          ].map(cat => (
-            <div key={cat.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 12, height: 12, borderRadius: 3, background: cat.bg, border: `1px solid ${cat.color}` }} />
-              <span style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 500 }}>{cat.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+        </Modal>
+      )}
     </div>
   );
 }
 
-// ---------- Apply Leave ----------
-function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
-  currentUser: Employee;
-  leaves: Leave[];
-  company: Company;
-  leaveTypes: any[];
-  onApply: () => void;
-}) {
-  const annualTypes = useMemo(() => leaveTypes.filter(t => !t.custom), [leaveTypes]);
-  const generalTypes = useMemo(() => leaveTypes.filter(t => t.custom === 'general'), [leaveTypes]);
-  const familyTypes = useMemo(() => leaveTypes.filter(t => t.custom === 'family'), [leaveTypes]);
-
-  const [type, setType] = useState('annual');
-  const [unit, setUnit] = useState('1');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [reason, setReason] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const selectedType = leaveTypes.find(t => t.id === type);
-  const isExempt = selectedType?.exempt;
-  const isFamily = selectedType?.custom === 'family';
-  const isGeneral = selectedType?.custom === 'general';
-
-  // Calculate remaining leaves for current period
-  const balance = getCurrentLeaveBalance(currentUser.join_date, leaves.filter(l => l.emp_id === currentUser.id), company?.basis_type, company?.basis_date, new Date(), company?.leave_disposal ?? 'expire');
-  const remaining = balance.remaining;
-
-  const now = new Date();
-  const getGeneralRemaining = (gt: any) => {
-    const used = leaves.filter(l => l.emp_id === currentUser.id && l.type === gt.id && l.status !== 'rejected' &&
-      new Date(l.start_date).getMonth() === now.getMonth() && new Date(l.start_date).getFullYear() === now.getFullYear()).reduce((sum, l) => sum + l.unit, 0);
-    return Math.max(0, gt.days - used);
-  };
-
-  const calculatedDays = useMemo(() => {
-    if (!startDate || !endDate) return 0;
-    if (startDate === endDate) return parseFloat(unit) || 1;
-    return daysInRange(startDate, endDate);
-  }, [startDate, endDate, unit]);
-
-  const submit = async () => {
-    if (!startDate || !endDate) return alert('시작일과 종료일을 선택해주세요.');
-    if (endDate < startDate) return alert('종료일은 시작일보다 빠를 수 없습니다.');
-    let u: number;
-    if (isExempt || isFamily || isGeneral || startDate !== endDate) {
-      u = daysInRange(startDate, endDate);
-    } else {
-      u = parseFloat(unit);
-    }
-    if (isNaN(u) || u <= 0) return alert('사용 일수가 올바르지 않습니다.');
-
-    let isExceeded = false;
-    if ((type === 'annual' || type === 'unearned_annual') && u > remaining) {
-      const confirmProceed = confirm(
-        `잔여 연차가 부족합니다. (현재 잔여 연차: ${remaining.toFixed(2)}일, 신청일수: ${u.toFixed(2)}일)\n\n` +
-        `보유 연차 한도를 초과하는 ${(u - remaining).toFixed(2)}일분은 무급 휴가로 차감되거나 차기 연차에서 땡겨 쓰기(차용) 처리됩니다.\n` +
-        `이대로 연차 신청을 진행하시겠습니까?`
-      );
-      if (!confirmProceed) return;
-      isExceeded = true;
-    }
-    if (isGeneral) {
-      const gt = generalTypes.find(g => g.id === type);
-      if (gt && u > getGeneralRemaining(gt)) {
-        return alert(`이번 달 잔여 ${gt.label}이 부족합니다. (잔여: ${getGeneralRemaining(gt)}일, 신청: ${u}일)`);
-      }
-    }
-    if (isFamily) {
-      const ft = familyTypes.find(f => f.id === type);
-      if (ft && u > ft.days) {
-        return alert(`${ft.label}은 회사 설정상 최대 ${ft.days}일까지만 신청할 수 있습니다.`);
-      }
-    }
-
-    setSubmitting(true);
-    try {
-      const finalReason = isExceeded ? (reason ? `${reason} (한도초과)` : '한도초과') : reason;
-      const res = await leaveAPI.applyLeave({
-        type,
-        unit: u,
-        startDate,
-        endDate,
-        reason: finalReason
-      });
-      if (res.success) {
-        alert(res.message);
-        setStartDate('');
-        setEndDate('');
-        setReason('');
-        setUnit('1');
-        onApply();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || '휴가 신청에 실패했습니다.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div style={{ maxWidth: 600, margin: '0 auto' }}>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)', margin: '0 0 6px' }}>휴가 신청하기</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--gray-500)' }}>
-          현재 사용 가능한 연차 잔여량: <strong style={{ color: 'var(--primary)', fontSize: 14 }}>{remaining.toFixed(2)}일</strong>
-        </div>
-      </div>
-
-      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div className="input-group">
-          <label className="input-label">휴가 종류</label>
-          <select 
-            value={type} 
-            onChange={e => { 
-              const newType = e.target.value;
-              setType(newType); 
-              if (newType === 'am_half' || newType === 'pm_half') {
-                setUnit('0.5');
-              } else {
-                setUnit('1');
-              }
-            }} 
-            className="input-field"
-          >
-            <option value="annual">연차 (일할 차감)</option>
-            {annualTypes.filter(t => t.id !== 'annual').map(t => (
-              <option key={t.id} value={t.id}>{t.label} ({t.exempt ? '차감 없음' : '연차 차감'})</option>
-            ))}
-            {generalTypes.length > 0 && <option disabled>— 회사 일반휴가 —</option>}
-            {generalTypes.map(t => (
-              <option key={t.id} value={t.id}>{t.label} (월 {t.days}일 한도)</option>
-            ))}
-            {familyTypes.length > 0 && <option disabled>— 경조사 휴가 —</option>}
-            {familyTypes.map(t => (
-              <option key={t.id} value={t.id}>{t.label} (최대 {t.days}일)</option>
-            ))}
-          </select>
-        </div>
-
-        {!isExempt && !isFamily && (
-          <div className="input-group">
-            <label className="input-label">
-              사용 단위 {startDate && endDate && startDate !== endDate ? '(기간 지정 시 자동계산)' : ''}
-            </label>
-            {type === 'am_half' || type === 'pm_half' || selectedType?.defaultUnit === 0.5 ? (
-              <input
-                type="text"
-                disabled
-                value="0.5일 (반차 고정)"
-                className="input-field"
-                style={{ background: '#f1f5f9', color: 'var(--primary)', fontWeight: 700 }}
-              />
-            ) : startDate && endDate && startDate !== endDate ? (
-              <input
-                type="text"
-                disabled
-                value={`${calculatedDays}일 (${startDate} ~ ${endDate} 자동 산출)`}
-                className="input-field"
-                style={{ background: '#f1f5f9', color: 'var(--gray-700)', fontWeight: 600 }}
-              />
-            ) : (
-              <select 
-                value={unit} 
-                onChange={e => setUnit(e.target.value)} 
-                className="input-field"
-              >
-                <option value="1">1일 (종일)</option>
-                <option value="0.5">0.5일 (반차)</option>
-                <option value="0.25">0.25일 (반반차)</option>
-              </select>
-            )}
-          </div>
-        )}
-
-        {isExempt && (
-          <div style={{ fontSize: 12, color: 'var(--warning)', background: 'var(--warning-light)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--warning-border)50', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Info size={16} /> 연차 차감 제외 대상 휴가입니다.
-          </div>
-        )}
-
-        {isFamily && (
-          <div style={{ fontSize: 12, color: '#b45309', background: '#FFFBEB', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--warning-border)50', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Info size={16} /> 경조사 휴가는 연차 차감이 없으며, 증빙 서류가 필요할 수 있습니다.
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div className="input-group">
-            <label className="input-label">시작일</label>
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={e => { setStartDate(e.target.value); if (!endDate) setEndDate(e.target.value); }} 
-              className="input-field" 
-            />
-          </div>
-          <div className="input-group">
-            <label className="input-label">종료일</label>
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={e => setEndDate(e.target.value)} 
-              className="input-field" 
-            />
-          </div>
-        </div>
-
-        {startDate && endDate && (
-          <div style={{ background: 'var(--primary-light)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--primary-border)50', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-800)' }}>
-              신청 기간: {startDate} {startDate !== endDate ? `~ ${endDate}` : ''}
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>
-              총 {calculatedDays}일 신청
-            </span>
-          </div>
-        )}
-
-        <div className="input-group">
-          <label className="input-label">사유</label>
-          <input 
-            type="text" 
-            value={reason} 
-            onChange={e => setReason(e.target.value)} 
-            placeholder="휴가 신청 사유를 간단히 입력하세요..." 
-            className="input-field" 
-          />
-        </div>
-
-        <button 
-          className="btn btn-primary" 
-          onClick={submit} 
-          disabled={submitting}
-          style={{ width: '100%', height: 44, fontSize: 14 }}
-        >
-          {submitting ? '신청 처리 중...' : '휴가 신청 완료'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Leave History / Approval ----------
-function LeaveHistory({ currentUser, leaves, employees, leaveTypes, allLeaveTypes, isAdmin, onApprove }: {
-  currentUser: Employee;
-  leaves: Leave[];
-  employees: Employee[];
-  leaveTypes: any[];
-  allLeaveTypes: any[];
-  isAdmin: boolean;
-  onApprove: () => void;
-}) {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-  const [pageSize, setPageSize] = useState<number>(20);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  
-  const [searchEmpName, setSearchEmpName] = useState<string>('');
-  const [startDateFilter, setStartDateFilter] = useState<string>('');
-  const [endDateFilter, setEndDateFilter] = useState<string>('');
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null); // 개별 승인/반려/취소 중복 클릭 방지
-
-  const myLeaves = useMemo(() =>
-    isAdmin ? leaves.filter(l => employees.some(e => e.id === l.emp_id && e.company_id === currentUser.company_id))
-            : leaves.filter(l => l.emp_id === currentUser.id),
-  [leaves, isAdmin, employees, currentUser]);
-
-  const pendingCount = myLeaves.filter(l => l.status === 'pending').length;
+// ═══════════════════════════════════════════════════════════════
+// 14. 입출고 이력 및 엑셀/CSV 내보내기 뷰
+// ═══════════════════════════════════════════════════════════════
+const HistoryView = memo(function HistoryView({ history, pageSize }: any) {
+  const ready = useReady(SKEL_MS.HISTORY);
+  const [filter, setFilter] = useState("전체");
+  const [page, setPage] = useState(1);
+  const [, startTx] = useTransition();
 
   const filtered = useMemo(() => {
-    let list = [...myLeaves];
-    if (isAdmin && searchEmpName.trim()) {
-      list = list.filter(l => {
-        const emp = employees.find(e => e.id === l.emp_id);
-        const nameToMatch = emp ? emp.name : (l.emp_name || '');
-        return nameToMatch.toLowerCase().includes(searchEmpName.trim().toLowerCase());
-      });
-    }
-    if (startDateFilter) {
-      list = list.filter(l => l.start_date >= startDateFilter);
-    }
-    if (endDateFilter) {
-      list = list.filter(l => l.start_date <= endDateFilter);
-    }
-    if (filter !== 'all') {
-      list = list.filter(l => l.status === filter);
-    }
-    return list.sort((a, b) => b.start_date.localeCompare(a.start_date));
-  }, [myLeaves, searchEmpName, startDateFilter, endDateFilter, filter, isAdmin, employees]);
+    const base = Array.isArray(history) ? history : [];
+    return filter === "전체" ? [...base].reverse() : [...base].reverse().filter((h) => h.type === filter);
+  }, [history, filter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, currentPage]);
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize]);
 
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filtered.slice(startIndex, startIndex + pageSize);
-  }, [filtered, currentPage, pageSize]);
-
-  const statusMap = {
-    pending: { label: '대기 중', color: 'var(--warning)', bg: 'var(--warning-light)' },
-    approved: { label: '승인됨', color: 'var(--success)', bg: 'var(--success-light)' },
-    rejected: { label: '반려됨', color: 'var(--danger)', bg: 'var(--danger-light)' },
-  };
-
-  const [bulkApproving, setBulkApproving] = useState(false);
-  const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-
-  const handleBulkApprove = async () => {
-    const pendingsOnPage = paginatedData.filter(l => l.status === 'pending');
-    if (pendingsOnPage.length === 0) return;
-    
-    if (!confirm(`현재 페이지에 있는 ${pendingsOnPage.length}건의 결재 대기 신청을 모두 일괄 승인하시겠습니까?`)) return;
-    
-    setBulkApproving(true);
-    let successCount = 0;
-    for (const leave of pendingsOnPage) {
-      try {
-        const res = await leaveAPI.updateLeaveStatus(leave.id, 'approved');
-        if (res.success) {
-          successCount++;
-        }
-      } catch (err) {
-        console.error(`Failed to approve leave ${leave.id}:`, err);
-      }
-    }
-    setBulkApproving(false);
-    alert(`${successCount}건의 신청이 정상적으로 일괄 승인되었습니다.`);
-    onApprove();
-  };
-
-  const handleAction = async (id: string, status: 'approved' | 'rejected') => {
-    if (actionLoadingId) return; // 중복 클릭 방지
-    setActionLoadingId(id + '_' + status);
-    try {
-      const res = await leaveAPI.updateLeaveStatus(id, status);
-      if (res.success) {
-        onApprove();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || '처리에 실패했습니다.');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const handleCancelMyLeave = async (id: string) => {
-    if (actionLoadingId) return; // 중복 클릭 방지
-    if (!confirm('신청하신 휴가를 정말 취소하시겠습니까?\n취소 시 연차 사용 일수가 즉시 환급/복원됩니다.')) return;
-    setActionLoadingId(id + '_cancel');
-    try {
-      await leaveAPI.deleteLeave(id);
-      alert('휴가 신청이 취소 처리되었습니다.');
-      onApprove();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '취소 처리에 실패했습니다.');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const pageNumbers = useMemo(() => {
-    const pages = new Set<number>();
-    for (let i = 1; i <= Math.min(10, totalPages); i++) {
-      pages.add(i);
-    }
-    for (let i = 20; i <= totalPages; i += 10) {
-      pages.add(i);
-    }
-    if (currentPage > 0 && currentPage <= totalPages) {
-      pages.add(currentPage);
-    }
-    return Array.from(pages).sort((a, b) => a - b);
-  }, [totalPages, currentPage]);
+  const exportCSV = useCallback(() => {
+    const headers = ["ID", "상품코드", "상품명", "구분", "수량", "담당부서", "처리자", "일시", "메모"];
+    const rows = filtered.map((h: any) => [
+      h.id, h.productCode, `"${h.productName}"`, h.type, h.qty, h.department || "원내", h.by, h.date, `"${h.note || ""}"`
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `inventory_history_${today()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filtered]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)' }}>
-            {isAdmin ? '신청/결재 관리' : '휴가 신청 내역'}
-          </h2>
-          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-            {isAdmin ? '소속 임직원들의 휴가 신청을 검토하고 승인하거나 반려합니다.' : '신청하신 휴가의 결재 상태를 조회하며, 직접 신청을 취소할 수 있습니다.'}
-          </p>
-        </div>
-        {isAdmin && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {pendingCount > 0 && (
-              <>
-                <StatusBadge label={`승인 대기 ${pendingCount}건`} color="var(--warning)" bg="var(--warning-light)" />
-                <button 
-                  className="btn btn-primary" 
-                  onClick={handleBulkApprove} 
-                  disabled={bulkApproving}
-                  style={{ padding: '6px 12px', fontSize: 12 }}
-                >
-                  {bulkApproving ? '승인 중...' : '현재 페이지 일괄 승인'}
-                </button>
-              </>
-            )}
-            <button 
-              className="btn" 
-              onClick={() => setShowBulkImport(true)} 
-              style={{ padding: '6px 12px', fontSize: 12, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              <FileText size={14} /> 엑셀/텍스트 일괄 등록
-            </button>
-          </div>
-        )}
+    <div>
+      <div style={{ ...ROW, marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 800 }}>입출고 이력{" "}
+          <span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>({filtered.length}건)</span>
+        </span>
+        <Btn variant="ghost" size="sm" onPointerDown={exportCSV}>📥 CSV 내보내기</Btn>
       </div>
 
-      {/* Search & Filter Options */}
-      <div className="glass-card animate-fade" style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.5)', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-        {isAdmin && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>임직원 이름 검색</span>
-            <input 
-              type="text" 
-              value={searchEmpName} 
-              onChange={e => { setSearchEmpName(e.target.value); setCurrentPage(1); }} 
-              placeholder="이름 입력 (예: 이광희)..." 
-              className="input-field"
-              style={{ padding: '6px 12px', fontSize: 12, minWidth: 160, margin: 0 }}
-            />
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>휴가 시작일 (부터)</span>
-            <input 
-              type="date" 
-              value={startDateFilter} 
-              onChange={e => { setStartDateFilter(e.target.value); setCurrentPage(1); }} 
-              className="input-field"
-              style={{ padding: '5px 10px', fontSize: 12, width: 135 }}
-            />
-          </div>
-          <span style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 18 }}>~</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>휴가 시작일 (까지)</span>
-            <input 
-              type="date" 
-              value={endDateFilter} 
-              onChange={e => { setEndDateFilter(e.target.value); setCurrentPage(1); }} 
-              className="input-field"
-              style={{ padding: '5px 10px', fontSize: 12, width: 135 }}
-            />
-          </div>
-        </div>
-        {(startDateFilter || endDateFilter || (isAdmin && searchEmpName)) && (
-          <button 
-            className="btn" 
-            onClick={() => { setStartDateFilter(''); setEndDateFilter(''); setSearchEmpName(''); setCurrentPage(1); }}
-            style={{ padding: '8px 14px', fontSize: 12, marginTop: 18, borderColor: 'var(--danger-border)', color: 'var(--danger)', background: 'var(--danger-light)' }}
-          >
-            필터 초기화
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        {["전체", "입고", "출고", "실사조정"].map((t) => (
+          <button
+            key={t}
+            onPointerDown={() => startTx(() => { setFilter(t); setPage(1); })}
+            style={{
+              border: "none", borderRadius: 99, padding: "6px 12px", fontSize: 12, fontWeight: 700,
+              cursor: "pointer", touchAction: "manipulation", minHeight: 34,
+              background: filter === t ? T.text : T.bg, color: filter === t ? "#fff" : T.sub
+            }}>
+            {t}
           </button>
-        )}
+        ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {['all', 'pending', 'approved', 'rejected'].map(f => (
-            <button 
-              key={f} 
-              onClick={() => { setFilter(f as any); setCurrentPage(1); }} 
-              style={{ 
-                padding: '6px 14px', 
-                borderRadius: 20, 
-                fontSize: 12, 
-                fontWeight: 600,
-                border: `1px solid ${filter === f ? 'var(--primary)' : 'var(--gray-200)'}`, 
-                background: filter === f ? 'var(--primary-light)' : '#fff', 
-                color: filter === f ? 'var(--primary)' : 'var(--gray-500)', 
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {f === 'all' ? '전체' : f === 'pending' ? '대기' : f === 'approved' ? '승인' : '반려'}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 600 }}>보기 개수:</span>
-          <select 
-            value={pageSize} 
-            onChange={e => { setPageSize(parseInt(e.target.value)); setCurrentPage(1); }} 
-            className="input-field" 
-            style={{ width: 85, padding: '4px 8px', fontSize: 12, margin: 0 }}
-          >
-            <option value={20}>20개씩</option>
-            <option value={30}>30개씩</option>
-            <option value={50}>50개씩</option>
-            <option value={100}>100개씩</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="table-container animate-scale">
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th>종류</th>
-              {isAdmin && <th>신청자</th>}
-              <th>일정</th>
-              <th>사용일</th>
-              <th>사유</th>
-              <th>결재상태</th>
-              <th style={{ textAlign: 'right' }}>관리 / 작업</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.length === 0 ? (
-              <tr>
-                <td colSpan={isAdmin ? 7 : 6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray-400)', fontSize: 14 }}>
-                  휴가 내역이 존재하지 않습니다.
-                </td>
-              </tr>
-            ) : (
-              paginatedData.map(l => {
-                // 활성 타입 우선 조회, 없으면 비활성 포함 전체 목록에서 fallback 조회 (설정 변경 후에도 기존 내역 정상 표시)
-                const lt = leaveTypes.find(x => x.id === l.type) || allLeaveTypes.find(x => x.id === l.type);
-                const stat = statusMap[l.status] || { label: l.status, color: 'var(--gray-500)', bg: 'var(--gray-100)' };
-                
-                return (
-                  <tr key={l.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: lt?.color || 'var(--primary)' }} />
-                        <span style={{ fontWeight: 600 }}>
-                          {lt?.label || l.type}
-                          {lt?.isHidden && <span style={{ fontSize: 10, color: 'var(--gray-400)', marginLeft: 4, fontWeight: 400 }}>(비활성)</span>}
-                        </span>
-                      </div>
-                    </td>
-                    {isAdmin && <td style={{ fontWeight: 600 }}>{l.emp_name} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--gray-500)' }}>({l.emp_dept})</span></td>}
-                    <td>
-                      {formatDateStr(l.start_date) === formatDateStr(l.end_date) 
-                        ? formatDateStr(l.start_date) 
-                        : `${formatDateStr(l.start_date)} ~ ${formatDateStr(l.end_date)}`}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>
-                      {/* exempt 타입이어도 l.unit 우선 표시 (반차 0.5일 → 무급연차 변환 시 1일로 잘못 계산되던 버그 수정) */}
-                      {lt?.exempt ? `${l.unit > 0 ? l.unit : daysInRange(l.start_date, l.end_date)}일 (제외)` : `${l.unit}일`}
-                    </td>
-                    <td style={{ color: 'var(--gray-500)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {l.reason || '-'}
-                    </td>
-                    <td>
-                      <StatusBadge label={stat.label} color={stat.color} bg={stat.bg} />
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        {isAdmin && l.status === 'pending' && (
-                          <>
-                            <button
-                              className="btn btn-primary"
-                              onClick={() => handleAction(l.id, 'approved')}
-                              style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}
-                              disabled={actionLoadingId !== null}
-                            >
-                              {actionLoadingId === l.id + '_approved' ? '처리 중...' : <><Check size={12} /> 승인</>}
-                            </button>
-                            <button
-                              className="btn btn-danger"
-                              onClick={() => handleAction(l.id, 'rejected')}
-                              style={{ padding: '4px 8px', fontSize: 11, gap: 4 }}
-                              disabled={actionLoadingId !== null}
-                            >
-                              {actionLoadingId === l.id + '_rejected' ? '처리 중...' : <><X size={12} /> 반려</>}
-                            </button>
-                          </>
-                        )}
-                        {isAdmin && (
-                          <button className="btn" onClick={() => setEditingLeave(l)} style={{ padding: '4px 8px', fontSize: 11 }}>
-                            수정
-                          </button>
-                        )}
-                        {!isAdmin && (
-                          <button 
-                            className="btn btn-danger" 
-                            onClick={() => handleCancelMyLeave(l.id)} 
-                            style={{ padding: '4px 8px', fontSize: 11 }}
-                            disabled={l.status === 'rejected' || actionLoadingId !== null}
-                          >
-                            {actionLoadingId === l.id + '_cancel' ? '취소 중...' : (l.status === 'approved' ? '취소 요청 (삭제)' : '신청 취소')}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {editingLeave && (
-        <EditLeaveModal
-          leave={editingLeave}
-          leaveTypes={leaveTypes}
-          allLeaveTypes={allLeaveTypes}
-          onClose={() => setEditingLeave(null)}
-          onSave={onApprove}
-        />
-      )}
-
-      {showBulkImport && (
-        <BulkImportModal
-          employees={employees}
-          leaveTypes={leaveTypes}
-          allLeaveTypes={allLeaveTypes}
-          onClose={() => setShowBulkImport(false)}
-          onComplete={onApprove}
-        />
-      )}
-
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: '0.5rem' }}>
-          <button 
-            className="btn" 
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            style={{ padding: '6px 12px', fontSize: 12 }}
-          >
-            이전
-          </button>
-          
-          {pageNumbers.map(page => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              style={{ 
-                padding: '6px 12px', 
-                fontSize: 12,
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontWeight: 600,
-                border: `1px solid ${currentPage === page ? 'var(--primary)' : 'var(--gray-200)'}`,
-                background: currentPage === page ? 'var(--primary)' : '#fff',
-                color: currentPage === page ? '#fff' : 'var(--gray-700)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {page}
-            </button>
-          ))}
-          
-          <button 
-            className="btn" 
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            style={{ padding: '6px 12px', fontSize: 12 }}
-          >
-            다음
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-
-// ---------- Edit Leave Modal ----------
-function EditLeaveModal({ leave, leaveTypes, allLeaveTypes, onClose, onSave }: {
-  leave: Leave;
-  leaveTypes: any[];
-  allLeaveTypes?: any[]; // 관리자용: 비활성 타입 포함 전체 목록 (설정에서 제거되더라도 수정 가능)
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  const [type, setType] = useState(leave.type);
-  const [unit, setUnit] = useState(leave.unit);
-  const [status, setStatus] = useState<'pending' | 'approved' | 'rejected'>(leave.status);
-  const [reason, setReason] = useState(leave.reason || '');
-  const [startDate, setStartDate] = useState(() => formatDateStr(leave.start_date));
-  const [endDate, setEndDate] = useState(() => formatDateStr(leave.end_date));
-  const [saving, setSaving] = useState(false);
-
-  // 관리자는 allLeaveTypes(비활성 포함 전체) 사용, 일반은 활성 leaveTypes만 사용
-  const effectiveLeaveTypes = allLeaveTypes || leaveTypes;
-
-  const handleTypeChange = (newType: string) => {
-    setType(newType);
-    const targetObj = effectiveLeaveTypes.find(t => t.id === newType);
-    if (targetObj?.defaultUnit) {
-      setUnit(targetObj.defaultUnit);
-    } else if (newType === 'am_half' || newType === 'pm_half') {
-      setUnit(0.5);
-    }
-  };
-
-  const handleStartDateChange = (val: string) => {
-    setStartDate(val);
-    if (val && endDate && val !== endDate) {
-      setUnit(daysInRange(val, endDate));
-    }
-  };
-
-  const handleEndDateChange = (val: string) => {
-    setEndDate(val);
-    if (startDate && val && startDate !== val) {
-      setUnit(daysInRange(startDate, val));
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await leaveAPI.updateLeaveDetails(leave.id, {
-        type,
-        unit: Number(unit),
-        status,
-        reason,
-        start_date: startDate,
-        end_date: endDate,
-      });
-      alert('휴가 내역이 정상적으로 수정되었습니다.');
-      onSave();
-      onClose();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '수정에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div className="glass-card animate-scale" style={{ background: '#fff', maxWidth: 480, width: '100%', padding: '1.75rem', borderRadius: 12, border: '1px solid var(--gray-200)', boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 10 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>휴가 내역 세부 수정</h3>
-          <button className="btn btn-ghost" onClick={onClose} style={{ padding: 4 }}>✕</button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">휴가 종류 (구분)</label>
-            <select value={type} onChange={e => handleTypeChange(e.target.value)} className="input-field">
-              {effectiveLeaveTypes.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.label}{t.isHidden ? ' (비활성)' : ''} ({t.exempt ? '연차차감제외' : '연차차감'})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">사용 일수 (unit)</label>
-              <input type="number" step="0.25" value={unit} onChange={e => setUnit(parseFloat(e.target.value) || 0)} className="input-field" />
-              <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                <button type="button" className="btn" onClick={() => setUnit(1.0)} style={{ padding: '2px 6px', fontSize: 10, background: unit === 1.0 ? 'var(--primary-light)' : '#fff', color: unit === 1.0 ? 'var(--primary)' : 'var(--gray-600)' }}>1일</button>
-                <button type="button" className="btn" onClick={() => setUnit(0.5)} style={{ padding: '2px 6px', fontSize: 10, background: unit === 0.5 ? 'var(--primary-light)' : '#fff', color: unit === 0.5 ? 'var(--primary)' : 'var(--gray-600)' }}>0.5일 (반차)</button>
-                <button type="button" className="btn" onClick={() => setUnit(0.25)} style={{ padding: '2px 6px', fontSize: 10, background: unit === 0.25 ? 'var(--primary-light)' : '#fff', color: unit === 0.25 ? 'var(--primary)' : 'var(--gray-600)' }}>0.25일 (반반차)</button>
+      {!ready ? (
+        Array.from({ length: 5 }).map((_, i) => <SkelCard key={i} rows={2} />)
+      ) : paged.length === 0 ? (
+        <Card><p style={{ margin: 0, textAlign: "center", color: T.muted, fontSize: 13 }}>기록된 이력이 없습니다.</p></Card>
+      ) : (
+        paged.map((h: any) => (
+          <Card key={h.id} style={{ marginBottom: 8 }}>
+            <div style={ROW}>
+              <div style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{h.productName ?? "-"}</span>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: T.muted }}>
+                  {h.productCode ?? ""} · 부서: {h.department || "원내"} · 처리자: {h.by ?? ""} · {h.date ?? ""}
+                </p>
+                {h.note && <p style={{ margin: "2px 0 0", fontSize: 11, color: T.sub }}>사유: {h.note}</p>}
               </div>
+              <Badge color={h.type === "입고" ? T.green : h.type === "출고" ? T.red : T.orange}>
+                {h.type} {h.qty}
+              </Badge>
             </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">결재 상태 (status)</label>
-              <select value={status} onChange={e => setStatus(e.target.value as any)} className="input-field">
-                <option value="approved">승인됨 (approved)</option>
-                <option value="pending">대기 중 (pending)</option>
-                <option value="rejected">반려됨 (rejected)</option>
-              </select>
-            </div>
-          </div>
+          </Card>
+        ))
+      )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">시작일</label>
-              <input type="date" value={startDate} onChange={e => handleStartDateChange(e.target.value)} className="input-field" />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">종료일</label>
-              <input type="date" value={endDate} onChange={e => handleEndDateChange(e.target.value)} className="input-field" />
-            </div>
-          </div>
-
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">신청 사유</label>
-            <input type="text" value={reason} onChange={e => setReason(e.target.value)} className="input-field" placeholder="사유 입력..." />
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 10 }}>
-            <button className="btn btn-ghost" onClick={onClose}>취소</button>
-            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? '저장 중...' : '수정 사항 저장'}</button>
-          </div>
-        </div>
-      </div>
+      <Pagination page={page} total={filtered.length} pageSize={pageSize} onChange={setPage} />
     </div>
+  );
+});
+HistoryView.displayName = "HistoryView";
+
+// ═══════════════════════════════════════════════════════════════
+// 15. 직원 정보 관리 뷰 (Employee & Member Management)
+// ═══════════════════════════════════════════════════════════════
+function MemberModal({ initial, company, onSave, onClose }: any) {
+  const isEdit = !!(initial && Object.keys(initial).length > 0);
+  const [f, setF] = useState(() => (isEdit ? { ...initial } : {
+    empNo: `EMP-${Math.floor(100 + Math.random() * 900)}`,
+    name: "", email: "", password: "", phone: "",
+    department: company?.departments?.[0] || "간호부", position: "간호사", role: ROLE.USER, status: "재직"
+  }));
+  const [err, setErr] = useState<any>({});
+  const set = useCallback((k: string, v: any) => { setF((p: any) => ({ ...p, [k]: v })); setErr((p: any) => ({ ...p, [k]: "" })); }, []);
+
+  const save = useCallback(() => {
+    const e: any = {};
+    const ne = V.uname(f.name); if (ne) e.name = ne;
+    const ee = V.email(f.email); if (ee) e.email = ee;
+    if (!isEdit) {
+      const pe = V.password(f.password); if (pe) e.password = pe;
+    }
+    if (Object.keys(e).length) { setErr(e); return; }
+    onSave(f);
+  }, [f, isEdit, onSave]);
+
+  return (
+    <Modal title={isEdit ? "직원 정보 수정" : "신규 직원 등록"} onClose={onClose}>
+      <Input label="사원/직원 번호" value={f.empNo} onChange={(e: any) => set("empNo", e.target.value)} placeholder="EMP-001" />
+      <Input label="성명" value={f.name} onChange={(e: any) => set("name", e.target.value)} error={err.name} placeholder="홍길동" />
+      <Input label="이메일 주소" type="email" value={f.email} onChange={(e: any) => set("email", e.target.value)} error={err.email} placeholder="user@medical.co.kr" />
+      {!isEdit && <Input label="비밀번호" type="password" value={f.password} onChange={(e: any) => set("password", e.target.value)} error={err.password} placeholder="영문+숫자 6자 이상" />}
+      <Input label="연락처" value={f.phone} onChange={(e: any) => set("phone", e.target.value)} placeholder="010-0000-0000" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Sel label="소속 부서" value={f.department} onChange={(e: any) => set("department", e.target.value)}>
+          {(company?.departments || DEPARTS).map((d: string) => <option key={d}>{d}</option>)}
+        </Sel>
+        <Sel label="직급/직책" value={f.position} onChange={(e: any) => set("position", e.target.value)}>
+          {POSITIONS.map((p) => <option key={p}>{p}</option>)}
+        </Sel>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Sel label="시스템 권한" value={f.role} onChange={(e: any) => set("role", e.target.value)}>
+          <option value={ROLE.USER}>일반 직원</option>
+          <option value={ROLE.ADMIN}>관리자 (Full Access)</option>
+        </Sel>
+        <Sel label="재직 상태" value={f.status} onChange={(e: any) => set("status", e.target.value)}>
+          <option value="재직">재직</option>
+          <option value="휴직">휴직</option>
+          <option value="퇴사">퇴사</option>
+        </Sel>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <Btn variant="ghost" full onPointerDown={onClose}>취소</Btn>
+        <Btn full onPointerDown={save}>{isEdit ? "수정 완료" : "직원 등록"}</Btn>
+      </div>
+    </Modal>
   );
 }
 
-// ---------- Employee Management ----------
-function EmployeeMgmt({ employees, currentUser, leaves, company, leaveTypes, allLeaveTypes, onUpdate }: {
-  employees: Employee[];
-  currentUser: Employee;
-  leaves: Leave[];
-  company: Company;
-  leaveTypes: any[];
-  allLeaveTypes: any[];
-  onUpdate: () => void;
-}) {
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', joinDate: '', department: '' });
-  const [loaModal, setLoaModal] = useState<Employee | null>(null);
-  const [selectedHistoryEmp, setSelectedHistoryEmp] = useState<Employee | null>(null);
+const MembersView = memo(function MembersView({ users, company, dispatch, currentUser, pageSize }: any) {
+  const ready = useReady(SKEL_MS.MEMBERS);
+  const [modal, setModal] = useState<any>(null);
+  const [delId, setDelId] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const safe = Array.isArray(users) ? users : [];
+  const adminCount = useMemo(() => safe.filter((u) => u.role === ROLE.ADMIN).length, [safe]);
+  const paged = useMemo(() => safe.slice((page - 1) * pageSize, page * pageSize), [safe, page, pageSize]);
 
-  const [sortBy, setSortBy] = useState<'default' | 'join_asc' | 'join_desc' | 'rem_asc' | 'rem_desc' | 'name_asc'>('default');
+  const saveMember = useCallback((data: any) => {
+    dispatch({ type: modal?.id ? "UPDATE" : "ADD", payload: modal?.id ? { ...modal, ...data } : data });
+    setModal(null);
+  }, [modal, dispatch]);
 
-  const pendingEmps = useMemo(() => 
-    employees.filter(e => e.company_id === currentUser.company_id && e.status === 'pending'),
-  [employees, currentUser]);
-
-  const sortedEmps = useMemo(() => {
-    const list = employees.filter(e => e.company_id === currentUser.company_id);
-    if (sortBy === 'default') return list;
-
-    const balanceMap = new Map<string, number>();
-    list.forEach(e => {
-      const bal = getCurrentLeaveBalance(
-        e.join_date,
-        leaves.filter(l => l.emp_id === e.id),
-        company?.basis_type,
-        company?.basis_date,
-        new Date(),
-        company?.leave_disposal ?? 'expire'
-      );
-      balanceMap.set(e.id, bal.remaining);
-    });
-
-    return [...list].sort((a, b) => {
-      if (sortBy === 'join_asc') return (a.join_date || '').localeCompare(b.join_date || '');
-      if (sortBy === 'join_desc') return (b.join_date || '').localeCompare(a.join_date || '');
-      if (sortBy === 'rem_asc') return (balanceMap.get(a.id) ?? 0) - (balanceMap.get(b.id) ?? 0);
-      if (sortBy === 'rem_desc') return (balanceMap.get(b.id) ?? 0) - (balanceMap.get(a.id) ?? 0);
-      if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '');
-      return 0;
-    });
-  }, [employees, currentUser, sortBy, leaves, company]);
-
-  const [regActionLoadingId, setRegActionLoadingId] = useState<string | null>(null); // 가입 승인/거절 중복 클릭 방지
-  const [showBulkImport, setShowBulkImport] = useState(false);
-
-  const handleApproveRegistration = async (emp: Employee) => {
-    if (regActionLoadingId) return; // 중복 클릭 방지
-    if (confirm(`${emp.name}님의 회원가입을 승인하시겠습니까?\n승인 시 즉시 시스템 로그인이 가능해집니다.`)) {
-      setRegActionLoadingId(emp.id + '_approve');
-      try {
-        const res = await employeeAPI.updateEmployee(emp.id, { status: 'active' });
-        if (res.success) {
-          alert(`${emp.name}님의 회원가입이 승인되었습니다.`);
-          onUpdate();
-        }
-      } catch (err: any) {
-        alert(err.response?.data?.message || '승인 처리 실패');
-      } finally {
-        setRegActionLoadingId(null);
-      }
-    }
-  };
-
-  const handleRejectRegistration = async (emp: Employee) => {
-    if (regActionLoadingId) return; // 중복 클릭 방지
-    if (confirm(`${emp.name}님의 회원가입 신청을 거절(삭제)하시겠습니까?`)) {
-      setRegActionLoadingId(emp.id + '_reject');
-      try {
-        const res = await employeeAPI.updateEmployee(emp.id, { status: 'resigned' });
-        if (res.success) {
-          alert(`${emp.name}님의 회원가입 신청이 거부되었습니다.`);
-          onUpdate();
-        }
-      } catch (err: any) {
-        alert(err.response?.data?.message || '거부 처리 실패');
-      } finally {
-        setRegActionLoadingId(null);
-      }
-    }
-  };
-
-  const startEdit = (emp: Employee) => {
-    setEditId(emp.id);
-    setForm({
-      name: emp.name,
-      email: emp.email,
-      phone: emp.phone || '',
-      joinDate: formatDateStr(emp.join_date),
-      department: emp.department || '',
-    });
-    setShowForm(true);
-  };
-
-  const startAdd = () => {
-    setEditId(null);
-    setForm({ name: '', email: '', phone: '', joinDate: '', department: '' });
-    setShowForm(true);
-  };
-
-  const [isEmpSaving, setIsEmpSaving] = useState(false);
-
-  const save = async () => {
-    if (!form.name || !form.email || !form.joinDate) return alert('이름, 이메일, 입사일은 필수항목입니다.');
-    const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(form.email.trim())) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
-
-    setIsEmpSaving(true);
-    try {
-      if (editId) {
-        const res = await employeeAPI.updateEmployee(editId, {
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          joinDate: form.joinDate,
-          department: form.department
-        });
-        if (res.success) alert(res.message);
-      } else {
-        const res = await employeeAPI.addEmployee({
-          ...form,
-          password: '1234'
-        });
-        if (res.success) alert('직원이 성공적으로 등록되었습니다.');
-      }
-      setShowForm(false);
-      onUpdate();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '직원 저장 실패');
-    } finally {
-      setIsEmpSaving(false);
-    }
-  };
-
-  const toggleResign = async (emp: Employee) => {
-    if (emp.status === 'resigned') {
-      if (confirm(`${emp.name} 직원을 다시 재직 상태로 전환하시겠습니까?`)) {
-        try {
-          await employeeAPI.updateEmployee(emp.id, { status: 'active', resign_date: null });
-          onUpdate();
-        } catch (err: any) {
-          alert(err.response?.data?.message);
-        }
-      }
-    } else {
-      const d = prompt('퇴사일을 입력하세요 (YYYY-MM-DD)', todayStr());
-      if (d) {
-        try {
-          await employeeAPI.updateEmployee(emp.id, { status: 'resigned', resign_date: d });
-          onUpdate();
-        } catch (err: any) {
-          alert(err.response?.data?.message);
-        }
-      }
-    }
-  };
-
-  const setLOA = async (emp: Employee, start: string | null, end: string | null) => {
-    try {
-      await employeeAPI.updateEmployee(emp.id, {
-        leaveOfAbsence: start ? { start, end: end || null } : null
-      });
-      setLoaModal(null);
-      onUpdate();
-    } catch (err: any) {
-      alert(err.response?.data?.message);
-    }
-  };
+  const rawDel = useCallback(() => { dispatch({ type: "DELETE", id: delId }); setDelId(null); }, [delId, dispatch]);
+  const doDel = useThrottle(rawDel, 600);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)' }}>임직원 관리</h2>
-          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>소속 직원의 기본 정보 수정, 가입 승인, 휴직 설정 및 퇴사 처리를 일괄 관리합니다.</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" onClick={() => setShowBulkImport(true)} style={{ gap: 6, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>
-            <FileText size={16} /> 엑셀/텍스트 휴가 일괄 등록
-          </button>
-          <button className="btn btn-primary" onClick={startAdd} style={{ gap: 6 }}>
-            <UserPlus size={16} /> 직원 추가 등록
-          </button>
-        </div>
+    <div>
+      <div style={{ ...ROW, marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 800 }}>원내 직원 관리{" "}
+          <span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>({safe.length}명)</span>
+        </span>
+        <Btn size="sm" onPointerDown={() => setModal({})}>+ 직원 추가</Btn>
       </div>
 
-      {pendingEmps.length > 0 && (
-        <div className="glass-card animate-scale" style={{ background: '#EFF6FF', border: '1.5px solid #60A5FA', padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <UserPlus size={18} style={{ color: '#2563EB' }} />
-              <span style={{ fontWeight: 700, fontSize: 15, color: '#1E40AF' }}>신규 회원가입 승인 대기 ({pendingEmps.length}명)</span>
-            </div>
-            <span style={{ fontSize: 11, color: '#3B82F6', fontWeight: 600 }}>관리자 승인 후 로그인 가능</span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12 }}>
-            {pendingEmps.map(emp => (
-              <div key={emp.id} style={{ background: '#ffffff', borderRadius: 10, padding: '12px 16px', border: '1px solid #BFDBFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--gray-900)' }}>{emp.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>({emp.department || '부서 미지정'})</span>
+      {!ready ? (
+        Array.from({ length: 3 }).map((_, i) => <SkelCard key={i} rows={2} />)
+      ) : (
+        paged.map((u: any) => {
+          const isOnly = adminCount === 1 && u.role === ROLE.ADMIN;
+          return (
+            <Card key={u.id} style={{ marginBottom: 8 }}>
+              <div style={{ ...ROW, gap: 8, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 3 }}>
+                    <b style={{ fontSize: 14 }}>{u.name ?? "-"}</b>
+                    <span style={{ fontSize: 11, color: T.muted }}>({u.empNo || "사번미지정"})</span>
+                    <Badge color={u.role === ROLE.ADMIN ? T.indigo : T.sub}>{u.role === ROLE.ADMIN ? "관리자" : "일반직원"}</Badge>
+                    <Badge color={u.status === "재직" ? T.green : T.red}>{u.status || "재직"}</Badge>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 2 }}>{emp.email} · 입사일: {formatDateStr(emp.join_date)}</div>
+                  <p style={{ margin: 0, fontSize: 12, color: T.sub }}>
+                    부서: <b>{u.department || "미정"}</b> | 직급: {u.position || "사원"} | 연락처: {u.phone || "-"}
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: T.muted }}>{u.email}</p>
                 </div>
-
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => handleApproveRegistration(emp)}
-                    style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
-                    disabled={regActionLoadingId !== null}
-                  >
-                    {regActionLoadingId === emp.id + '_approve' ? '처리 중...' : <><Check size={12} /> 승인</>}
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={() => handleRejectRegistration(emp)}
-                    style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
-                    disabled={regActionLoadingId !== null}
-                  >
-                    {regActionLoadingId === emp.id + '_reject' ? '처리 중...' : <><X size={12} /> 거절</>}
-                  </button>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <Btn variant="ghost" size="sm" onPointerDown={() => setModal(u)}>수정</Btn>
+                  {u.id !== currentUser?.id && (
+                    <Btn variant="danger" size="sm" onPointerDown={() => { if (!isOnly) setDelId(u.id); }} style={{ opacity: isOnly ? .45 : 1, pointerEvents: isOnly ? "none" : "auto" }}>
+                      삭제
+                    </Btn>
+                  )}
                 </div>
               </div>
+            </Card>
+          );
+        })
+      )}
+
+      <Pagination page={page} total={safe.length} pageSize={pageSize} onChange={setPage} />
+
+      {modal !== null && <MemberModal initial={modal && Object.keys(modal).length > 0 ? modal : null} company={company} onSave={saveMember} onClose={() => setModal(null)} />}
+      {delId !== null && (
+        <Modal title="직원 삭제 확인" onClose={() => setDelId(null)}>
+          <p style={{ fontSize: 14, color: T.sub, marginBottom: 18 }}>해당 직원 계정을 삭제하시겠습니까?</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="ghost" full onPointerDown={() => setDelId(null)}>취소</Btn>
+            <Btn variant="danger" full onPointerDown={doDel}>삭제</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+});
+MembersView.displayName = "MembersView";
+
+// ═══════════════════════════════════════════════════════════════
+// 16. 회사/원내 정보 관리 뷰 (Company Management)
+// ═══════════════════════════════════════════════════════════════
+function CompanyView({ company, setCompany, isAdmin }: { company: any; setCompany: any; isAdmin: any }) {
+  const ready = useReady(SKEL_MS.COMPANY);
+  const [f, setF] = useState({ ...company });
+  const [toast, setToast] = useState(false);
+  const [newDept, setNewDept] = useState("");
+
+  const handleSave = () => {
+    setCompany(f);
+    setToast(true);
+    setTimeout(() => setToast(false), TOAST_MS);
+  };
+
+  const addDept = () => {
+    if (!newDept.trim()) return;
+    if (f.departments.includes(newDept.trim())) return;
+    setF((p: any) => ({ ...p, departments: [...p.departments, newDept.trim()] }));
+    setNewDept("");
+  };
+
+  const removeDept = (d: string) => {
+    setF((p: any) => ({ ...p, departments: p.departments.filter((item: string) => item !== d) }));
+  };
+
+  if (!ready) return <SkelCard rows={5} />;
+
+  return (
+    <div>
+      {toast && <Toast msg="회사 / 원내 정보가 저장되었습니다." color={T.green} />}
+      <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>회사 및 원내 프로필 설정</p>
+
+      <Card style={{ marginBottom: 12 }}>
+        <Input label="기관 / 회사명" value={f.name} onChange={(e: any) => setF({ ...f, name: e.target.value })} disabled={!isAdmin} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Input label="기관 코드" value={f.code} onChange={(e: any) => setF({ ...f, code: e.target.value })} disabled={!isAdmin} />
+          <Input label="사업자 / 등록번호" value={f.bizNo} onChange={(e: any) => setF({ ...f, bizNo: e.target.value })} disabled={!isAdmin} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Input label="대표자명" value={f.ceo} onChange={(e: any) => setF({ ...f, ceo: e.target.value })} disabled={!isAdmin} />
+          <Input label="대표 전화" value={f.phone} onChange={(e: any) => setF({ ...f, phone: e.target.value })} disabled={!isAdmin} />
+        </div>
+        <Input label="주소" value={f.address} onChange={(e: any) => setF({ ...f, address: e.target.value })} disabled={!isAdmin} />
+      </Card>
+
+      <Card style={{ marginBottom: 12 }}>
+        <SLabel>원내 부서 목록 관리</SLabel>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          {f.departments.map((d: string) => (
+            <span key={d} style={{ background: T.bg, border: `1px solid ${T.bdr}`, borderRadius: 99, padding: "5px 12px", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {d}
+              {isAdmin && <b onPointerDown={() => removeDept(d)} style={{ cursor: "pointer", color: T.red }}>✕</b>}
+            </span>
+          ))}
+        </div>
+        {isAdmin && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={newDept} onChange={(e) => setNewDept(e.target.value)} placeholder="새 부서명 (예: 원무과)" style={{ ...INP, flex: 1, border: `1.5px solid ${T.bdr}` }} />
+            <Btn onPointerDown={addDept}>+ 부서 추가</Btn>
+          </div>
+        )}
+      </Card>
+
+      {isAdmin && <Btn full size="lg" onPointerDown={handleSave}>💾 설정 변경사항 저장</Btn>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 17. 설정 뷰
+// ═══════════════════════════════════════════════════════════════
+function SettingsView({ pageSize, setPageSize }: { pageSize: number; setPageSize: (n: number) => void }) {
+  const device = useDeviceInfo();
+  return (
+    <div>
+      <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>시스템 설정</p>
+      <Card style={{ marginBottom: 10 }}>
+        <SLabel>페이지당 목록 표시 개수</SLabel>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {PAGE_OPTS.map((n) => (
+            <button
+              key={n}
+              onPointerDown={() => setPageSize(n)}
+              style={{
+                border: `1.5px solid ${pageSize === n ? T.text : T.bdr}`, borderRadius: 10,
+                padding: "12px 0", fontSize: 15, fontWeight: 800, cursor: "pointer", minHeight: 48,
+                touchAction: "manipulation", background: pageSize === n ? T.text : T.sur, color: pageSize === n ? "#fff" : T.sub
+              }}>
+              {n}개씩 보기
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <SLabel>모바일 카메라 & 스캐너 가이드</SLabel>
+        {device.ios ? (
+          <p style={{ fontSize: 12, color: T.sub, margin: 0, lineHeight: 1.8 }}>
+            <b>iPhone / iPad 설정</b><br />
+            설정 앱 → Safari (또는 Chrome) → 카메라 → '허용' 선택
+          </p>
+        ) : device.android ? (
+          <p style={{ fontSize: 12, color: T.sub, margin: 0, lineHeight: 1.8 }}>
+            <b>Android 설정</b><br />
+            Chrome 주소창 자물쇠 🔒 탭 → 사이트 설정 → 카메라 → '허용' 선택
+          </p>
+        ) : (
+          <p style={{ fontSize: 12, color: T.sub, margin: 0, lineHeight: 1.8 }}>
+            카메라 스캔은 <b>HTTPS 프로토콜</b> 및 브라우저 권한 허용이 필수적입니다.
+          </p>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 18. 로그인 / 회원가입 뷰
+// ═══════════════════════════════════════════════════════════════
+function AuthView({ users, userDispatch, onLogin, company }: { users: any; userDispatch: any; onLogin: any; company: any }) {
+  const [tab, setTab] = useState("login");
+  const [remember, setRemember] = useState(() => !!ls.get(LS_EMAIL));
+  const [f, setF] = useState(() => ({ name: "", email: ls.get(LS_EMAIL), password: "", confirm: "" }));
+  const [err, setErr] = useState<any>({});
+  const [gErr, setGErr] = useState("");
+
+  const set = useCallback((k: string, v: any) => { setF((p: any) => ({ ...p, [k]: v })); setErr((p: any) => ({ ...p, [k]: "" })); setGErr(""); }, []);
+
+  const rawLogin = useCallback(() => {
+    const e: any = {};
+    const ee = V.email(f.email); if (ee) e.email = ee;
+    if (!(f.password ?? "").trim()) e.password = "비밀번호를 입력해 주세요.";
+    if (Object.keys(e).length) { setErr(e); return; }
+    const u = (users ?? []).find((u: any) => u.email === (f.email ?? "").trim() && u.password === f.password);
+    if (!u) { setGErr("이메일 또는 비밀번호가 올바르지 않습니다."); return; }
+    if (remember) ls.set(LS_EMAIL, (f.email ?? "").trim()); else ls.del(LS_EMAIL);
+    onLogin(u);
+  }, [f, users, remember, onLogin]);
+  const login = useThrottle(rawLogin, 800);
+
+  const rawRegister = useCallback(() => {
+    const e: any = {};
+    const ne = V.uname(f.name); if (ne) e.name = ne;
+    const ee = V.email(f.email); if (ee) e.email = ee;
+    else if ((users ?? []).find((u: any) => u.email === (f.email ?? "").trim())) e.email = "이미 사용 중인 이메일입니다.";
+    const pe = V.password(f.password); if (pe) e.password = pe;
+    if (f.password !== f.confirm) e.confirm = "비밀번호가 일치하지 않습니다.";
+    if (Object.keys(e).length) { setErr(e); return; }
+    userDispatch({
+      type: "ADD",
+      payload: {
+        empNo: `EMP-${Math.floor(100 + Math.random() * 900)}`,
+        name: (f.name ?? "").trim(),
+        email: (f.email ?? "").trim(),
+        password: f.password,
+        role: ROLE.USER,
+        status: "재직",
+        department: "간호부",
+        position: "사원",
+      }
+    });
+    setTab("login"); setF((p: any) => ({ ...p, name: "", password: "", confirm: "" })); setErr({}); setGErr("");
+  }, [f, users, userDispatch]);
+  const register = useThrottle(rawRegister, 800);
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.text, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 360 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 44 }}>🏥</div>
+          <h1 style={{ fontSize: 22, fontWeight: 900, margin: "6px 0 4px", color: "#fff" }}>{company?.name || "원내 모바일 재고관리"}</h1>
+          <p style={{ color: "rgba(255,255,255,.5)", fontSize: 12, margin: 0 }}>Mobile Inventory & Barcode System</p>
+        </div>
+
+        <div style={{ background: T.sur, borderRadius: 18, padding: "22px 20px 24px" }}>
+          <div style={{ display: "flex", background: T.bg, borderRadius: 10, padding: 3, marginBottom: 18 }}>
+            {[["login", "로그인"], ["register", "직원 가입"]].map(([v, l]) => (
+              <button
+                key={v}
+                onPointerDown={() => { setTab(v); setErr({}); setGErr(""); }}
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800,
+                  fontSize: 14, touchAction: "manipulation", minHeight: 40,
+                  background: tab === v ? T.sur : "transparent", color: tab === v ? T.text : T.muted,
+                  boxShadow: tab === v ? "0 1px 4px rgba(0,0,0,.08)" : "none", transition: "all .18s"
+                }}>
+                {l}
+              </button>
             ))}
           </div>
-        </div>
-      )}
 
-      <div className="glass-card animate-fade" style={{ padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-700)' }}>직원 표시 정렬:</span>
-          <select 
-            value={sortBy} 
-            onChange={e => setSortBy(e.target.value as any)} 
-            className="input-field" 
-            style={{ width: 'auto', padding: '4px 10px', fontSize: 12, margin: 0 }}
-          >
-            <option value="default">기본순 (DB 등록순)</option>
-            <option value="join_asc">입사일 오래된 순 (오름차순)</option>
-            <option value="join_desc">입사일 최신순 (내림차순)</option>
-            <option value="rem_asc">잔여연차 적은 순 (마이너스 순)</option>
-            <option value="rem_desc">잔여연차 많은 순 (내림차순)</option>
-            <option value="name_asc">이름 가나다순</option>
-          </select>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>
-          총 <strong style={{ color: 'var(--primary)' }}>{sortedEmps.length}</strong>명의 임직원
-        </div>
-      </div>
+          {gErr && <div style={{ background: `${T.red}12`, border: `1px solid ${T.red}40`, borderRadius: 8, padding: "10px 13px", color: T.red, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{gErr}</div>}
 
-      {showForm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-card animate-scale" style={{ background: '#fff', maxWidth: 560, width: '100%', padding: '1.75rem', borderRadius: 14, border: '1.5px solid var(--primary-border)', boxShadow: 'var(--shadow-lg)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 12 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)' }}>{editId ? '직원 기본 정보 수정' : '신규 직원 등록'}</h3>
-              <button className="btn btn-ghost" onClick={() => setShowForm(false)} style={{ padding: 4, fontSize: 18, width: 32, height: 32 }}>✕</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">이름 *</label>
-                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">이메일 *</label>
-                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-field" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">연락처</label>
-                <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))} className="input-field" placeholder="010-0000-0000" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">입사일 *</label>
-                <input type="date" value={form.joinDate} onChange={e => setForm(f => ({ ...f, joinDate: e.target.value }))} className="input-field" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">부서</label>
-                <input type="text" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} className="input-field" placeholder="부서명 입력" />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setShowForm(false)} disabled={isEmpSaving}>취소</button>
-              <button className="btn btn-primary" onClick={save} disabled={isEmpSaving}>{isEmpSaving ? '저장 중...' : '저장'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {loaModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-card animate-scale" style={{ background: '#FFFDF9', maxWidth: 480, width: '100%', padding: '1.75rem', borderRadius: 14, border: '1.5px solid var(--warning)', boxShadow: 'var(--shadow-lg)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--warning-border)40', paddingBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--gray-900)' }}>
-                <ShieldAlert size={16} style={{ color: 'var(--warning)' }} />
-                {loaModal.name} 임직원 휴직 설정
-              </div>
-              <button className="btn btn-ghost" onClick={() => setLoaModal(null)} style={{ padding: 4, fontSize: 18, width: 32, height: 32 }}>✕</button>
-            </div>
-            <LOAForm emp={loaModal} onSave={setLOA} onCancel={() => setLoaModal(null)} />
-          </div>
-        </div>
-      )}
-
-      {selectedHistoryEmp && (
-        <HistoryModal 
-          emp={selectedHistoryEmp} 
-          leaves={leaves} 
-          company={company} 
-          leaveTypes={leaveTypes}
-          allLeaveTypes={allLeaveTypes}
-          onClose={() => setSelectedHistoryEmp(null)} 
-          onRefresh={onUpdate}
-        />
-      )}
-
-      <div className="table-container animate-scale">
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th onClick={() => setSortBy(sortBy === 'name_asc' ? 'default' : 'name_asc')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                이름 {sortBy === 'name_asc' ? '▲' : ''}
-              </th>
-              <th>부서</th>
-              <th>연락처</th>
-              <th>이메일</th>
-              <th onClick={() => setSortBy(sortBy === 'join_asc' ? 'join_desc' : 'join_asc')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                입사일 {sortBy === 'join_asc' ? '▲' : sortBy === 'join_desc' ? '▼' : ''}
-              </th>
-              <th>상태</th>
-              <th onClick={() => setSortBy(sortBy === 'rem_asc' ? 'rem_desc' : 'rem_asc')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                잔여연차 (현재주기) {sortBy === 'rem_asc' ? '▲' : sortBy === 'rem_desc' ? '▼' : ''}
-              </th>
-              <th style={{ textAlign: 'right' }}>작업</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedEmps.map(emp => {
-              const balance = getCurrentLeaveBalance(emp.join_date, leaves.filter(l => l.emp_id === emp.id), company?.basis_type, company?.basis_date, new Date(), company?.leave_disposal ?? 'expire');
-              const total = balance.granted;
-              const remaining = balance.remaining;
-              const loaActive = emp.leave_of_absence && emp.leave_of_absence.start <= todayStr() && (!emp.leave_of_absence.end || emp.leave_of_absence.end >= todayStr());
-              
-              return (
-                <tr key={emp.id} style={{ opacity: emp.status === 'resigned' ? 0.6 : 1 }}>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-                      <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                      {emp.role === 'admin' && <StatusBadge label="인사관리자" color="var(--primary)" bg="var(--primary-light)" />}
-                    </div>
-                  </td>
-                  <td style={{ color: 'var(--gray-500)' }}>{emp.department || '-'}</td>
-                  <td style={{ color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>{emp.phone || '-'}</td>
-                  <td style={{ color: 'var(--gray-500)' }}>{emp.email}</td>
-                  <td style={{ color: 'var(--gray-500)', fontSize: 12 }}>{formatDateStr(emp.join_date)}</td>
-                  <td>
-                    {emp.status === 'resigned' ? (
-                      <StatusBadge label={`퇴사 (${emp.resign_date || ''})`} color="var(--danger)" bg="var(--danger-light)" />
-                    ) : emp.status === 'pending' ? (
-                      <StatusBadge label="승인 대기" color="var(--warning)" bg="var(--warning-light)" />
-                    ) : loaActive ? (
-                      <StatusBadge label="휴직 중" color="var(--warning)" bg="var(--warning-light)" />
-                    ) : (
-                      <StatusBadge label="재직 중" color="var(--success)" bg="var(--success-light)" />
-                    )}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>
-                    <span style={{ color: remaining < 0 ? 'var(--danger)' : 'var(--gray-900)' }}>{remaining.toFixed(2)}일 잔여</span>
-                    <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--gray-500)', marginLeft: 4 }}>(사용 {balance.used.toFixed(2)}일 / 총 {total}일)</span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 6 }}>
-                      {emp.status === 'pending' ? (
-                        <>
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => handleApproveRegistration(emp)}
-                            style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
-                            disabled={regActionLoadingId !== null}
-                          >
-                            {regActionLoadingId === emp.id + '_approve' ? '처리 중...' : <><Check size={12} /> 승인</>}
-                          </button>
-                          <button
-                            className="btn btn-danger"
-                            onClick={() => handleRejectRegistration(emp)}
-                            style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
-                            disabled={regActionLoadingId !== null}
-                          >
-                            {regActionLoadingId === emp.id + '_reject' ? '처리 중...' : <><X size={12} /> 거절</>}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="btn" onClick={() => setSelectedHistoryEmp(emp)} style={{ padding: '5px 10px', fontSize: 11, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>이력</button>
-                          <button className="btn" onClick={() => startEdit(emp)} style={{ padding: '5px 10px', fontSize: 11 }}>수정</button>
-                          <button className="btn" onClick={() => setLoaModal(emp)} style={{ padding: '5px 10px', fontSize: 11 }} disabled={emp.status === 'resigned'}>휴직설정</button>
-                          <button 
-                            className={`btn ${emp.status === 'resigned' ? 'btn-ghost' : 'btn-danger'}`} 
-                            onClick={() => toggleResign(emp)} 
-                            style={{ padding: '5px 10px', fontSize: 11 }}
-                          >
-                            {emp.status === 'resigned' ? '재직 전환' : '퇴사 처리'}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {showBulkImport && (
-        <BulkImportModal
-          employees={employees}
-          leaveTypes={leaveTypes}
-          allLeaveTypes={allLeaveTypes}
-          onClose={() => setShowBulkImport(false)}
-          onComplete={onUpdate}
-        />
-      )}
-    </div>
-  );
-}
-
-// ---------- History Modal ----------
-function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose, onRefresh }: {
-  emp: Employee;
-  leaves: Leave[];
-  company: Company;
-  leaveTypes: any[];
-  allLeaveTypes: any[]; // 관리자용 전체 타입 (비활성 포함)
-  onClose: () => void;
-  onRefresh: () => void;
-}) {
-  const balance = getCurrentLeaveBalance(emp.join_date, leaves.filter(l => l.emp_id === emp.id), company?.basis_type, company?.basis_date, new Date(), company?.leave_disposal ?? 'expire');
-  
-  const empLeaves = useMemo(() => {
-    return leaves.filter(l => l.emp_id === emp.id).sort((a, b) => b.start_date.localeCompare(a.start_date));
-  }, [leaves, emp.id]);
-
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [batchType, setBatchType] = useState<string>('unpaid_annual');
-  const [editingLeave, setEditingLeave] = useState<Leave | null>(null);
-  const [isUpdating, setIsUpdating] = useState<boolean>(false);
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === empLeaves.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(empLeaves.map(l => l.id));
-    }
-  };
-
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const handleBatchTypeChange = async () => {
-    if (selectedIds.length === 0) return alert('일괄 변경할 휴가 항목을 1개 이상 선택해 주세요.');
-    // 관리자는 allLeaveTypes에서 레이블 조회 (비활성 타입도 변경 가능)
-    const targetTypeObj = allLeaveTypes.find(t => t.id === batchType);
-    const targetLabel = targetTypeObj ? targetTypeObj.label : batchType;
-
-    if (!confirm(`선택한 ${selectedIds.length}건의 휴가 구분을 '${targetLabel}'(으)로 일괄 변경하시겠습니까?\n변경 시 연차 차감 일수가 재산수됩니다.`)) return;
-
-    setIsUpdating(true);
-    try {
-      await leaveAPI.batchUpdateLeaveType(selectedIds, batchType);
-      alert(`${selectedIds.length}건의 휴가 종류가 '${targetLabel}'(으)로 성공적으로 일괄 변경되었습니다.`);
-      setSelectedIds([]);
-      onRefresh();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '일괄 변경 처리에 실패했습니다.');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const handleDeleteLeave = async (leaveId: string) => {
-    if (deletingId) return;
-    if (!confirm('해당 휴가 내역을 정말로 삭제하시겠습니까? 삭제 후에는 연차 사용 일수가 즉시 재산출됩니다.')) return;
-    setDeletingId(leaveId);
-    try {
-      await leaveAPI.deleteLeave(leaveId);
-      alert('휴가 내역이 삭제되었습니다.');
-      onRefresh();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '삭제 처리에 실패했습니다.');
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.4)',
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem'
-    }}>
-      <div className="glass-card animate-scale" style={{
-        background: '#fff',
-        maxWidth: 750,
-        width: '100%',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        position: 'relative',
-        padding: '2rem',
-        border: '1px solid var(--gray-200)',
-        boxShadow: 'var(--shadow-lg)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--gray-200)', paddingBottom: '1rem' }}>
-          <div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-900)' }}>
-              {emp.name}님의 전체 연차 이력 및 등록 휴가 관리
-            </h3>
-            <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-              입사일: {formatDateStr(emp.join_date)} · 부서: {emp.department || '미지정'} · 이메일: {emp.email}
-            </p>
-          </div>
-          <button 
-            className="btn btn-ghost" 
-            onClick={onClose} 
-            style={{ fontSize: 20, padding: 4, width: 36, height: 36 }}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ background: 'var(--primary-light)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-border)50' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: 4 }}>현재 주기 상태 요약</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>
-                주기: {balance.activeCycle?.startDate} ~ {balance.activeCycle?.endDate}
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: balance.remaining < 0 ? 'var(--danger)' : 'var(--primary)' }}>
-                잔여 {balance.remaining.toFixed(2)}일 (부여: {balance.granted}일 / 사용: {balance.used.toFixed(2)}일)
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)' }}>회차별 연차 생성 이력</div>
-              <button 
-                className="btn btn-primary"
-                onClick={async () => {
-                  if (confirm(`${emp.name}님에게 1일 연차 선사용(사전승인)을 등록하여 소멸 예정 연차 1일을 보존/사용할 수 있도록 등록하시겠습니까?`)) {
-                    try {
-                      await leaveAPI.applyLeave({
-                        type: 'unearned_annual',
-                        unit: 1,
-                        startDate: todayStr(),
-                        endDate: todayStr(),
-                        reason: '소멸 예정 연차 보존 (사전 승인 1일 사용)',
-                        empId: emp.id
-                      });
-                      alert('1일 연차 선사용(사전승인)이 성공적으로 등록되었습니다.');
-                      onRefresh();
-                    } catch (err: any) {
-                      alert(err.response?.data?.message || '등록 실패');
-                    }
-                  }
-                }}
-                style={{ padding: '4px 10px', fontSize: 11, gap: 4 }}
-              >
-                + 소멸 연차 보존 (1일 선사용 등록)
-              </button>
-            </div>
-
-            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', padding: '10px 12px', borderRadius: 8, fontSize: 11, color: '#92400E', marginBottom: 12 }}>
-              <strong>💡 소멸 예정 연차 활용/보존 방안 안내:</strong>
-              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                <li><strong>이월 처리</strong>: 환경설정 탭에서 연차 처분 방식을 <code>다음 주기로 이월(carryover)</code>로 설정하시면 미사용 소멸 연차가 다음 회차로 자동 이월됩니다.</li>
-                <li><strong>선사용/반차 활용</strong>: 소멸 예정 연차가 있더라도 <code>오후/오전반차(0.5일)</code> 또는 <code>연차 선사용(사전승인)</code>으로 1일 또는 반차 단위로 당겨서 활용할 수 있습니다.</li>
-              </ul>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {balance.allCycles.map((c, ci) => {
-                const isActive = balance.activeCycle?.startDate === c.startDate && balance.activeCycle?.endDate === c.endDate;
-                return (
-                  <div 
-                    key={ci} 
-                    style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column',
-                      padding: '12px 16px', 
-                      borderRadius: 8,
-                      border: `1px solid ${isActive ? 'var(--primary-border)' : 'var(--gray-200)'}`,
-                      background: isActive ? 'var(--primary-light)15' : '#f8fafc',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: isActive ? 'var(--primary)' : 'var(--gray-800)' }}>
-                        {c.label} {isActive && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 10, background: 'var(--primary-light)', color: 'var(--primary)' }}>현재 주기</span>}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--gray-500)', fontWeight: 500 }}>
-                        {c.startDate} ~ {c.endDate}
-                      </span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 8, fontSize: 12 }}>
-                      <div>
-                        <div style={{ color: 'var(--gray-500)', fontSize: 10, fontWeight: 600 }}>총 부여일수</div>
-                        <div style={{ fontWeight: 600, color: 'var(--gray-800)', marginTop: 2 }}>
-                          {c.grantedDays}일
-                          {c.debtDays ? <div style={{ fontSize: 9, color: 'var(--danger)', marginTop: 1 }}>(전주기부채 -{c.debtDays}일)</div> : null}
-                          {c.carryOverDays ? <div style={{ fontSize: 9, color: 'var(--primary)', marginTop: 1 }}>(전주기이월 +{c.carryOverDays}일)</div> : null}
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--gray-500)', fontSize: 10, fontWeight: 600 }}>사용일수</div>
-                        <div style={{ fontWeight: 600, color: 'var(--success)', marginTop: 2 }}>{c.usedDays.toFixed(2)}일</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--gray-500)', fontSize: 10, fontWeight: 600 }}>잔여일수</div>
-                        <div style={{ fontWeight: 700, color: c.remainingDays < 0 ? 'var(--danger)' : 'var(--primary)', marginTop: 2 }}>{c.remainingDays.toFixed(2)}일</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div>
-                <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--gray-900)' }}>등록된 휴가 내역 및 일괄 종류 변경</h4>
-                <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 2 }}>
-                  예비군, 무급연차, 임산부단축근무 등이 연차로 잘못 일괄 등록된 경우 항목을 선택하여 타 휴가 종류로 일괄 전환할 수 있습니다.
-                </p>
-              </div>
-            </div>
-
-            {empLeaves.length > 0 && (
-              <div style={{ background: '#F8FAFC', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={empLeaves.length > 0 && selectedIds.length === empLeaves.length} 
-                      onChange={toggleSelectAll} 
-                      style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 14, height: 14 }} 
-                    />
-                    전체 선택 ({selectedIds.length}/{empLeaves.length})
-                  </label>
+          {tab === "login" ? (
+            <>
+              <Input label="이메일" type="email" value={f.email ?? ""} onChange={(e: any) => set("email", e.target.value)} error={err.email} placeholder="admin@company.com" />
+              <Input label="비밀번호" type="password" value={f.password ?? ""} onChange={(e: any) => set("password", e.target.value)} onKeyDown={(e: any) => { if (e.key === "Enter") login(); }} error={err.password} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <div
+                  onPointerDown={() => setRemember((p) => !p)}
+                  style={{
+                    width: 18, height: 18, borderRadius: 4, cursor: "pointer",
+                    border: `2px solid ${remember ? T.green : T.bdr}`, background: remember ? T.green : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>
+                  {remember && <span style={{ color: "#fff", fontSize: 11, fontWeight: 900 }}>✓</span>}
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, color: 'var(--gray-600)', fontWeight: 500 }}>변경할 휴가 종류:</span>
-                  <select 
-                    value={batchType} 
-                    onChange={e => setBatchType(e.target.value)} 
-                    className="input-field" 
-                    style={{ padding: '4px 8px', fontSize: 12, width: 'auto', margin: 0 }}
-                  >
-                    {/* 관리자는 비활성 포함 전체 타입으로 변경 가능 */}
-                    {allLeaveTypes.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}{t.isHidden ? ' (비활성)' : ''} ({t.exempt ? '차감제외' : '연차차감'})
-                      </option>
-                    ))}
-                  </select>
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={handleBatchTypeChange} 
-                    disabled={selectedIds.length === 0 || isUpdating} 
-                    style={{ padding: '5px 12px', fontSize: 11 }}
-                  >
-                    {isUpdating ? '변경 중...' : '선택 건 휴가종류 일괄 변경'}
-                  </button>
-                </div>
+                <span onPointerDown={() => setRemember((p) => !p)} style={{ fontSize: 12, color: T.sub, cursor: "pointer" }}>이메일 기억하기</span>
               </div>
-            )}
-
-            {empLeaves.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--gray-400)', fontSize: 12, background: '#fafafa', borderRadius: 8 }}>
-                등록된 휴가 내역이 없습니다.
-              </div>
-            ) : (
-              <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8 }}>
-                <table className="custom-table" style={{ fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9' }}>
-                      <th style={{ width: 36, textAlign: 'center' }}>선택</th>
-                      <th>기간</th>
-                      <th>휴가 구분</th>
-                      <th>일수</th>
-                      <th>상태</th>
-                      <th>사유</th>
-                      <th style={{ textAlign: 'right' }}>관리</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {empLeaves.map(l => {
-                      const isChecked = selectedIds.includes(l.id);
-                      // 활성 타입 우선, 없으면 allLeaveTypes에서 fallback (비활성 타입도 일괄변경 목록에 표시)
-                      const typeObj = leaveTypes.find(t => t.id === l.type) || allLeaveTypes.find(t => t.id === l.type);
-                      const typeLabel = typeObj ? typeObj.label : l.type;
-                      const isExempt = typeObj ? typeObj.exempt : false;
-                      
-                      return (
-                        <tr key={l.id} style={{ background: isChecked ? 'var(--primary-light)20' : 'transparent' }}>
-                          <td style={{ textAlign: 'center' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={isChecked} 
-                              onChange={() => toggleSelectOne(l.id)} 
-                              style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 14, height: 14 }} 
-                            />
-                          </td>
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            {formatDateStr(l.start_date)} {l.start_date !== l.end_date ? `~ ${formatDateStr(l.end_date)}` : ''}
-                          </td>
-                          <td>
-                            <span style={{ 
-                              fontSize: 11, 
-                              padding: '2px 6px', 
-                              borderRadius: 4, 
-                              fontWeight: 600, 
-                              background: isExempt ? '#F3F4F6' : '#EEF2FF', 
-                              color: isExempt ? '#4B5563' : '#4F46E5', 
-                              border: `1px solid ${isExempt ? '#E5E7EB' : '#C7D2FE'}` 
-                            }}>
-                              {typeLabel}{typeObj?.isHidden ? ' (비활성)' : ''} {isExempt ? '(차감제외)' : ''}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: 600 }}>{fmtUnit(l.unit)}</td>
-                          <td>
-                            <StatusBadge 
-                              label={l.status === 'approved' ? '승인됨' : l.status === 'pending' ? '대기중' : '반려됨'} 
-                              color={l.status === 'approved' ? 'var(--success)' : l.status === 'pending' ? 'var(--warning)' : 'var(--danger)'} 
-                              bg={l.status === 'approved' ? 'var(--success-light)' : l.status === 'pending' ? 'var(--warning-light)' : 'var(--danger-light)'} 
-                            />
-                          </td>
-                          <td style={{ color: 'var(--gray-600)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {l.reason || '-'}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: 4 }}>
-                              <button className="btn" onClick={() => setEditingLeave(l)} style={{ padding: '3px 8px', fontSize: 10 }}>수정</button>
-                              <button className="btn btn-danger" onClick={() => handleDeleteLeave(l.id)} disabled={deletingId === l.id} style={{ padding: '3px 8px', fontSize: 10 }}>
-                                {deletingId === l.id ? '삭제중' : '삭제'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {editingLeave && (
-          <EditLeaveModal
-            leave={editingLeave}
-            leaveTypes={leaveTypes}
-            allLeaveTypes={allLeaveTypes}
-            onClose={() => setEditingLeave(null)}
-            onSave={() => {
-              setEditingLeave(null);
-              onRefresh();
-            }}
-          />
-        )}
-
-        <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn btn-primary" onClick={onClose} style={{ padding: '8px 20px' }}>
-            확인
-          </button>
+              <Btn full size="lg" onPointerDown={login}>로그인</Btn>
+              <p style={{ fontSize: 11, color: T.muted, textAlign: "center", marginTop: 14, marginBottom: 0 }}>
+                관리자: admin@company.com / admin1234
+              </p>
+            </>
+          ) : (
+            <>
+              <Input label="이름" value={f.name ?? ""} onChange={(e: any) => set("name", e.target.value)} error={err.name} placeholder="홍길동" />
+              <Input label="이메일" type="email" value={f.email ?? ""} onChange={(e: any) => set("email", e.target.value)} error={err.email} placeholder="user@company.com" />
+              <Input label="비밀번호" type="password" value={f.password ?? ""} onChange={(e: any) => set("password", e.target.value)} error={err.password} placeholder="영문+숫자 6자 이상" />
+              <Input label="비밀번호 확인" type="password" value={f.confirm ?? ""} onChange={(e: any) => set("confirm", e.target.value)} onKeyDown={(e: any) => { if (e.key === "Enter") register(); }} error={err.confirm} />
+              <Btn full size="lg" onPointerDown={register}>직원 회원가입 신청</Btn>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ---------- Bulk Import Modal (Excel/CSV/Text Copy-Paste) ----------
-interface ParsedBulkItem {
-  id: string;
-  name: string;
-  matchedEmp: Employee | null;
-  dateStr: string;
-  unit: number;
-  typeRaw: string;
-  typeMapped: string;
-  typeLabel: string;
-  isExempt: boolean;
-  isValid: boolean;
-  errorMsg?: string;
-}
+// ═══════════════════════════════════════════════════════════════
+// 19. 메인 App 루트
+// ═══════════════════════════════════════════════════════════════
+const NAV_BASE = Object.freeze([
+  { id: VIEW.DASH, l: "홈", ic: "⊞" },
+  { id: VIEW.PRODUCTS, l: "재고", ic: "📦" },
+  { id: VIEW.SCAN, l: "스캔", ic: "📷" },
+  { id: VIEW.HISTORY, l: "이력", ic: "📋" },
+]);
 
-function parseBulkText(text: string, emps: Employee[], types: any[]): ParsedBulkItem[] {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-  const result: ParsedBulkItem[] = [];
+const NAV_ADMIN = Object.freeze([
+  ...NAV_BASE,
+  { id: VIEW.MEMBERS, l: "직원", ic: "👥" },
+  { id: VIEW.COMPANY, l: "원내", ic: "🏥" },
+  { id: VIEW.SETTINGS, l: "설정", ic: "⚙" },
+]);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (i === 0 && (line.includes('이름') || line.includes('날짜') || line.includes('Name') || line.includes('Date'))) {
-      continue;
-    }
+const NAV_USER = Object.freeze([
+  ...NAV_BASE,
+  { id: VIEW.SETTINGS, l: "설정", ic: "⚙" },
+]);
 
-    let tokens = line.split('\t');
-    if (tokens.length < 3) tokens = line.split(',');
-    if (tokens.length < 3) tokens = line.split('|');
-    if (tokens.length < 3) tokens = line.split(/\s+/);
+export default function App() {
+  const [user, setUser] = useState<any>(null);
+  const [company, setCompany] = useState<any>(INIT_COMPANY);
+  const [view, setView] = useState<any>(VIEW.DASH);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [products, prdDispatch] = useReducer(prdReducer, INIT_PRODUCTS);
+  const [users, usrDispatch] = useReducer(usrReducer, INIT_USERS);
+  const [history, histDispatch] = useReducer(histReducer, INIT_HISTORY);
+  const [, startTx] = useTransition();
 
-    if (tokens.length < 2) continue;
+  const isAdmin = user?.role === ROLE.ADMIN;
+  const nav = isAdmin ? NAV_ADMIN : NAV_USER;
 
-    const name = tokens[0]?.trim() || '';
-    const dateRaw = tokens[1]?.trim() || '';
-    const unitRaw = tokens[2]?.trim() || '1';
-    const typeRaw = tokens[3]?.trim() || '연차';
+  const logout = useCallback(() => { setUser(null); setView(VIEW.DASH); }, []);
+  const goView = useCallback((v: string) => startTx(() => setView(v)), [startTx]);
 
-    let normalizedDate = dateRaw;
-    try {
-      const parsedD = parseLocalDate(dateRaw);
-      if (!isNaN(parsedD.getTime())) {
-        normalizedDate = formatLocalDate(parsedD);
-      }
-    } catch {
-      // keep raw
-    }
+  if (!user) return <AuthView users={users} userDispatch={usrDispatch} onLogin={setUser} company={company} />;
 
-    let unitVal = parseFloat(unitRaw);
-    if (isNaN(unitVal) || unitVal <= 0) {
-      if (typeRaw.includes('반차')) unitVal = 0.5;
-      else unitVal = 1.0;
-    }
-
-    let typeMapped = 'annual';
-    let typeLabel = '연차';
-    let isExempt = false;
-
-    const rawLower = typeRaw.toLowerCase();
-    if (rawLower.includes('무급')) {
-      typeMapped = 'unpaid_annual';
-      typeLabel = '무급연차 (차감제외)';
-      isExempt = true;
-    } else if (rawLower.includes('선지급') || rawLower.includes('차용') || rawLower.includes('선사용')) {
-      typeMapped = 'unearned_annual';
-      typeLabel = '연차 선사용(사전승인)';
-      isExempt = false;
-    } else if (rawLower.includes('오전') || rawLower === 'am_half') {
-      typeMapped = 'am_half';
-      typeLabel = '오전반차 (0.5일)';
-      unitVal = 0.5;
-      isExempt = false;
-    } else if (rawLower.includes('오후') || rawLower === 'pm_half') {
-      typeMapped = 'pm_half';
-      typeLabel = '오후반차 (0.5일)';
-      unitVal = 0.5;
-      isExempt = false;
-    } else {
-      const matchedCustom = types.find(t => t.label === typeRaw || t.id === typeRaw);
-      if (matchedCustom) {
-        typeMapped = matchedCustom.id;
-        typeLabel = matchedCustom.label;
-        isExempt = matchedCustom.exempt || false;
-      } else if (unitVal === 0.5) {
-        typeMapped = 'am_half';
-        typeLabel = '반차 (0.5일)';
-      } else {
-        typeMapped = 'annual';
-        typeLabel = '연차';
-      }
-    }
-
-    const matchedEmp = emps.find(e => e.name.trim() === name.trim() || e.id === name.trim()) || null;
-    let isValid = true;
-    let errorMsg = undefined;
-
-    if (!matchedEmp) {
-      isValid = false;
-      errorMsg = '등록되지 않은 사원명';
-    } else if (!normalizedDate || normalizedDate.length < 8) {
-      isValid = false;
-      errorMsg = '날짜 형식 오류';
-    }
-
-    result.push({
-      id: `bulk_${i}_${Math.random().toString(36).substr(2, 4)}`,
-      name,
-      matchedEmp,
-      dateStr: normalizedDate,
-      unit: unitVal,
-      typeRaw,
-      typeMapped,
-      typeLabel,
-      isExempt,
-      isValid,
-      errorMsg
-    });
+  if (!VALID_VIEWS.has(view)) {
+    setView(VIEW.DASH as any);
   }
 
-  return result;
-}
-
-function BulkImportModal({ employees, leaveTypes, allLeaveTypes, onClose, onComplete }: {
-  employees: Employee[];
-  leaveTypes: any[];
-  allLeaveTypes: any[];
-  onClose: () => void;
-  onComplete: () => void;
-}) {
-  const [rawText, setRawText] = useState('');
-  const [autoApprove, setAutoApprove] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
-
-  const effectiveTypes = useMemo(() => allLeaveTypes || leaveTypes, [allLeaveTypes, leaveTypes]);
-
-  const parsedItems = useMemo(() => {
-    if (!rawText.trim()) return [];
-    return parseBulkText(rawText, employees, effectiveTypes);
-  }, [rawText, employees, effectiveTypes]);
-
-  const validItems = useMemo(() => parsedItems.filter(p => p.isValid), [parsedItems]);
-  const invalidItems = useMemo(() => parsedItems.filter(p => !p.isValid), [parsedItems]);
-
-  const totalAnnualDays = useMemo(() => 
-    validItems.filter(i => !i.isExempt).reduce((sum, i) => sum + i.unit, 0),
-  [validItems]);
-
-  const totalUnpaidDays = useMemo(() => 
-    validItems.filter(i => i.isExempt).reduce((sum, i) => sum + i.unit, 0),
-  [validItems]);
-
-  const loadParkSample = () => {
-    const sample = `박유진\t2024-09-19\t0.5\t연차
-박유진\t2024-09-23\t0.5\t연차
-박유진\t2024-10-21\t0.5\t연차
-박유진\t2024-11-14\t0.5\t연차
-박유진\t2024-11-18\t0.5\t연차
-박유진\t2024-11-20\t0.5\t연차
-박유진\t2024-11-21\t1.0\t연차
-박유진\t2024-11-27\t0.5\t연차
-박유진\t2025-01-04\t1.0\t연차
-박유진\t2025-02-27\t1.0\t연차
-박유진\t2025-02-28\t1.0\t연차
-박유진\t2025-01-08\t0.5\t연차
-박유진\t2025-01-24\t0.5\t연차
-박유진\t2025-03-19\t1.0\t연차
-박유진\t2025-03-29\t1.0\t연차
-박유진\t2025-05-13\t1.0\t연차
-박유진\t2025-05-19\t0.5\t연차
-박유진\t2025-05-22\t0.5\t연차
-박유진\t2025-05-29\t0.5\t연차
-박유진\t2025-06-18\t0.5\t연차
-박유진\t2025-07-19\t1.0\t연차
-박유진\t2025-07-22\t0.5\t연차
-박유진\t2025-07-29\t0.5\t연차
-박유진\t2025-08-18\t0.5\t연차
-박유진\t2025-08-23\t1.0\t연차
-박유진\t2025-08-26\t0.5\t연차
-박유진\t2025-08-30\t1.0\t연차
-박유진\t2025-09-08\t0.5\t연차
-박유진\t2025-09-10\t0.5\t연차
-박유진\t2025-09-12\t0.5\t연차
-박유진\t2025-09-16\t0.5\t연차
-박유진\t2025-10-10\t1.0\t연차
-박유진\t2025-10-11\t1.0\t연차
-박유진\t2025-09-26\t0.5\t연차
-박유진\t2025-10-20\t0.5\t연차
-박유진\t2025-10-24\t0.5\t연차
-박유진\t2025-10-27\t0.5\t연차
-박유진\t2025-10-30\t0.5\t연차
-박유진\t2025-11-24\t0.5\t연차
-박유진\t2026-02-26\t1.0\t연차
-박유진\t2026-02-27\t1.0\t연차
-박유진\t2026-03-03\t1.0\t연차
-박유진\t2026-01-30\t0.5\t연차
-박유진\t2026-02-06\t0.5\t연차
-박유진\t2026-03-04\t1.0\t무급
-박유진\t2026-03-05\t1.0\t무급
-박유진\t2026-03-06\t1.0\t무급
-박유진\t2026-04-15\t0.5\t무급
-박유진\t2026-04-20\t0.5\t무급
-박유진\t2026-04-21\t1.0\t무급
-박유진\t2026-04-22\t0.5\t무급
-박유진\t2026-05-04\t1.0\t무급
-박유진\t2026-04-30\t0.5\t무급
-박유진\t2026-05-09\t1.0\t무급
-박유진\t2026-05-18\t0.5\t무급
-박유진\t2026-05-20\t0.5\t무급
-박유진\t2026-05-29\t0.5\t연차
-박유진\t2026-06-10\t0.5\t무급
-박유진\t2026-06-18\t0.5\t무급
-박유진\t2026-06-22\t0.5\t무급
-박유진\t2026-06-26\t0.5\t무급
-박유진\t2026-07-18\t1.0\t무급
-박유진\t2026-08-18\t1.0\t연차
-박유진\t2026-08-19\t1.0\t연차
-박유진\t2026-07-13\t0.5\t무급
-박유진\t2026-07-22\t0.5\t무급
-박유진\t2026-08-03\t1.0\t연차`;
-    setRawText(sample);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
-      if (text) setRawText(text);
-    };
-    reader.readAsText(file, 'utf-8');
-  };
-
-  const handleExecuteImport = async () => {
-    if (validItems.length === 0) return alert('일괄 등록 가능한 유효 데이터가 없습니다.');
-    if (invalidItems.length > 0) {
-      if (!confirm(`유효하지 않은 ${invalidItems.length}건을 제외하고, 유효 데이터 ${validItems.length}건만 일괄 등록하시겠습니까?`)) return;
-    } else {
-      if (!confirm(`총 ${validItems.length}건의 휴가 데이터를 시스템에 일괄 등록하시겠습니까?\n\n- 연차: ${totalAnnualDays.toFixed(1)}일\n- 무급휴가: ${totalUnpaidDays.toFixed(1)}일`)) return;
-    }
-
-    setIsImporting(true);
-    try {
-      const itemsToSubmit = validItems.map(item => ({
-        empId: item.matchedEmp!.id,
-        type: item.typeMapped,
-        unit: item.unit,
-        startDate: item.dateStr,
-        endDate: item.dateStr,
-        reason: item.isExempt ? '일괄 등록 (무급연차)' : '일괄 등록 (연차)',
-        status: autoApprove ? ('approved' as const) : ('pending' as const)
-      }));
-
-      const res = await leaveAPI.applyBulkLeaves(itemsToSubmit);
-      alert(`🎉 일괄 등록 완료!\n\n총 ${res.total}건 중 ${res.successCount}건이 성공적으로 등록되었습니다.${res.failCount > 0 ? `\n(실패: ${res.failCount}건)` : ''}`);
-      onComplete();
-      onClose();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '일괄 등록 중 오류가 발생했습니다.');
-    } finally {
-      setIsImporting(false);
+  const renderView = () => {
+    switch (view) {
+      case VIEW.DASH:
+        return <Dashboard products={products} history={history} company={company} />;
+      case VIEW.PRODUCTS:
+        return <ProductsView products={products} company={company} dispatch={prdDispatch} isAdmin={isAdmin} pageSize={pageSize} />;
+      case VIEW.SCAN:
+        return <ScanView products={products} company={company} prdDispatch={prdDispatch} histDispatch={histDispatch} user={user} />;
+      case VIEW.HISTORY:
+        return <HistoryView history={history} pageSize={pageSize} />;
+      case VIEW.MEMBERS:
+        return <MembersView users={users} company={company} dispatch={usrDispatch} currentUser={user} pageSize={pageSize} />;
+      case VIEW.COMPANY:
+        return <CompanyView company={company} setCompany={setCompany} isAdmin={isAdmin} />;
+      case VIEW.SETTINGS:
+        return <SettingsView pageSize={pageSize} setPageSize={setPageSize} />;
+      default:
+        return <Dashboard products={products} history={history} company={company} />;
     }
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div className="glass-card animate-scale" style={{ background: '#fff', maxWidth: 880, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '2rem', borderRadius: 16, border: '1px solid var(--gray-200)', boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 12 }}>
+    <ErrorBoundary>
+      <div style={{ maxWidth: 520, margin: "0 auto", minHeight: "100vh", background: T.bg, display: "flex", flexDirection: "column", color: T.text }}>
+        <header
+          style={{
+            background: T.sur, padding: "12px 16px", display: "flex",
+            justifyContent: "space-between", alignItems: "center",
+            borderBottom: `1px solid ${T.bdr}`, position: "sticky", top: 0, zIndex: 100
+          }}>
           <div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-900)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FileText size={20} style={{ color: 'var(--primary)' }} />
-              스마트 엑셀/텍스트 휴가 일괄 등록 (Bulk Import)
-            </h3>
-            <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-              엑셀 표에서 <code>이름 | 날짜 | 일수 | 구분</code> 열을 그대로 복사하여 붙여넣거나 CSV/TXT 파일을 업로드하세요.
-            </p>
-          </div>
-          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 20, padding: 4, width: 36, height: 36 }}>✕</button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label className="btn" style={{ padding: '6px 12px', fontSize: 12, cursor: 'pointer', background: '#f8fafc', borderColor: 'var(--gray-300)' }}>
-                📁 CSV/텍스트 파일 선택
-                <input type="file" accept=".csv,.txt,.tsv" onChange={handleFileUpload} style={{ display: 'none' }} />
-              </label>
-              <button className="btn" onClick={loadParkSample} style={{ padding: '6px 12px', fontSize: 12, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>
-                ✦ 박유진 사원 67건 샘플 텍스트 로드
-              </button>
-            </div>
-            {parsedItems.length > 0 && (
-              <button className="btn btn-ghost" onClick={() => setRawText('')} style={{ fontSize: 12, color: 'var(--gray-500)' }}>
-                초기화
-              </button>
-            )}
-          </div>
-
-          <textarea 
-            value={rawText}
-            onChange={e => setRawText(e.target.value)}
-            placeholder={`엑셀에서 복사한 데이터를 여기에 붙여넣으세요 (Ctrl+V)\n\n예시 형식:\n박유진\t2024-09-19\t0.5\t연차\n박유진\t2026-03-04\t1.0\t무급`}
-            rows={6}
-            className="input-field"
-            style={{ fontFamily: 'monospace', fontSize: 12, padding: 12, lineHeight: 1.5 }}
-          />
-
-          {parsedItems.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                <div style={{ background: 'var(--primary-light)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--primary-border)50' }}>
-                  <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>총 파싱 건수</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gray-900)', marginTop: 2 }}>{parsedItems.length}건</div>
-                  <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>유효: {validItems.length}건 / 오류: {invalidItems.length}건</div>
-                </div>
-                <div style={{ background: '#EEF2FF', padding: '10px 14px', borderRadius: 8, border: '1px solid #C7D2FE' }}>
-                  <div style={{ fontSize: 11, color: '#4F46E5', fontWeight: 600 }}>연차 (선지급/차용 포함)</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#4338CA', marginTop: 2 }}>{totalAnnualDays.toFixed(1)}일</div>
-                  <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>한도 초과 시 차기 부채 차감</div>
-                </div>
-                <div style={{ background: '#F3F4F6', padding: '10px 14px', borderRadius: 8, border: '1px solid #E5E7EB' }}>
-                  <div style={{ fontSize: 11, color: '#4B5563', fontWeight: 600 }}>무급 연차 (차감 제외)</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#1F2937', marginTop: 2 }}>{totalUnpaidDays.toFixed(1)}일</div>
-                  <div style={{ fontSize: 10, color: 'var(--gray-500)', marginTop: 1 }}>연차 잔여일수 차감 안함</div>
-                </div>
-              </div>
-
-              {invalidItems.length > 0 && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '8px 12px', borderRadius: 8, fontSize: 11 }}>
-                  ⚠️ <strong>오류 검출:</strong> {invalidItems.length}건의 행이 등록되지 않은 사원명이거나 날짜 형식이 올바르지 않습니다. 소속 임직원 이름을 확인해 주세요.
-                </div>
-              )}
-
-              <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8 }}>
-                <table className="custom-table" style={{ fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9' }}>
-                      <th style={{ width: 60, textAlign: 'center' }}>상태</th>
-                      <th>사원명</th>
-                      <th>날짜</th>
-                      <th>사용 일수</th>
-                      <th>분류된 휴가 종류</th>
-                      <th>원문 구분</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsedItems.map((item, idx) => (
-                      <tr key={item.id} style={{ background: !item.isValid ? '#FEF2F2' : (idx % 2 === 1 ? '#f8fafc' : '#fff') }}>
-                        <td style={{ textAlign: 'center' }}>
-                          {item.isValid ? (
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: 'var(--success-light)', color: 'var(--success)' }}>정상</span>
-                          ) : (
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: 'var(--danger-light)', color: 'var(--danger)' }} title={item.errorMsg}>오류</span>
-                          )}
-                        </td>
-                        <td style={{ fontWeight: 600 }}>
-                          {item.name} {item.matchedEmp ? <span style={{ fontSize: 10, color: 'var(--gray-500)', fontWeight: 400 }}>({item.matchedEmp.department || '부서'})</span> : <span style={{ fontSize: 10, color: 'var(--danger)' }}>(미등록)</span>}
-                        </td>
-                        <td>{item.dateStr}</td>
-                        <td style={{ fontWeight: 600 }}>{item.unit}일</td>
-                        <td>
-                          <span style={{
-                            fontSize: 11,
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            fontWeight: 600,
-                            background: item.isExempt ? '#F3F4F6' : '#EEF2FF',
-                            color: item.isExempt ? '#4B5563' : '#4F46E5',
-                            border: `1px solid ${item.isExempt ? '#E5E7EB' : '#C7D2FE'}`
-                          }}>
-                            {item.typeLabel}
-                          </span>
-                        </td>
-                        <td style={{ color: 'var(--gray-500)' }}>{item.typeRaw}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--gray-200)', paddingTop: 14, marginTop: 4 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
-              <input 
-                type="checkbox" 
-                checked={autoApprove} 
-                onChange={e => setAutoApprove(e.target.checked)} 
-                style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 15, height: 15 }} 
-              />
-              등록 즉시 승인(approved) 상태로 처리 (과거 이력 일괄 등록 표준)
-            </label>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-ghost" onClick={onClose} disabled={isImporting}>취소</button>
-              <button 
-                className="btn btn-primary" 
-                onClick={handleExecuteImport} 
-                disabled={validItems.length === 0 || isImporting} 
-                style={{ padding: '8px 20px', fontWeight: 600 }}
-              >
-                {isImporting ? '등록 중...' : `유효 데이터 ${validItems.length}건 일괄 등록 적용`}
-              </button>
+            <span style={{ fontWeight: 900, fontSize: 15 }}>{company.name}</span>
+            <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>
+              {user.name} ({user.department || "원내"}) · {isAdmin ? "관리자" : "직원"}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+          <Btn variant="ghost" size="sm" onPointerDown={logout}>로그아웃</Btn>
+        </header>
 
-function LOAForm({ emp, onSave, onCancel }: { emp: Employee; onSave: (emp: Employee, start: string | null, end: string | null) => Promise<void> | void; onCancel: () => void }) {
-  const [start, setStart] = useState(emp.leave_of_absence?.start || '');
-  const [end, setEnd] = useState(emp.leave_of_absence?.end || '');
-  const [isLoaSaving, setIsLoaSaving] = useState(false);
+        <main style={{ flex: 1, padding: "14px 13px", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 72px)" }}>
+          {renderView()}
+        </main>
 
-  const handleLoaSave = async (s: string | null, e: string | null) => {
-    if (isLoaSaving) return;
-    setIsLoaSaving(true);
-    try {
-      await onSave(emp, s, e);
-    } finally {
-      setIsLoaSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">휴직 시작일</label>
-          <input type="date" value={start} onChange={e => setStart(e.target.value)} className="input-field" />
-        </div>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label">휴직 종료일 (선택)</label>
-          <input type="date" value={end} onChange={e => setEnd(e.target.value)} className="input-field" />
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-        <button className="btn btn-primary" onClick={() => handleLoaSave(start, end)} disabled={isLoaSaving}>
-          {isLoaSaving ? '처리 중...' : '휴직 일정 적용'}
-        </button>
-        {emp.leave_of_absence && (
-          <button className="btn btn-danger" onClick={() => handleLoaSave(null, null)} disabled={isLoaSaving}>
-            {isLoaSaving ? '처리 중...' : '휴직 해제 처리'}
-          </button>
-        )}
-        <button className="btn" onClick={onCancel} disabled={isLoaSaving}>닫기</button>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Company Settings ----------
-function CompanySettings({ company, employees, currentUser, onSave }: {
-  company: Company;
-  employees: Employee[];
-  currentUser: Employee;
-  onSave: () => void;
-}) {
-  const [local, setLocal] = useState<Company>({ ...company });
-  const [isSaving, setIsSaving] = useState(false);
-
-  const myEmps = useMemo(() => employees.filter(e => e.company_id === currentUser.company_id && e.status === 'active'), [employees, currentUser]);
-  const admins = myEmps.filter(e => e.role === 'admin');
-  const nonAdmins = myEmps.filter(e => e.role !== 'admin');
-
-  const set = (k: keyof Company, v: any) => setLocal(p => ({ ...p, [k]: v }));
-  
-  const save = async () => {
-    if (isSaving) return;
-    const invalidGeneral = (local.general_types || []).some(g => isNaN(Number(g.days)) || Number(g.days) < 0);
-    const invalidFamily = (local.family_types || []).some(f => isNaN(Number(f.days)) || Number(f.days) < 0);
-    if (invalidGeneral || invalidFamily) return alert('휴가 일수에는 0 이상의 유효한 숫자만 입력해 주세요.');
-
-    setIsSaving(true);
-    try {
-      const res = await companyAPI.updateCompany(local);
-      if (res.success) {
-        alert(res.message);
-        onSave();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || '회사 설정 저장 실패');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const addGeneral = () => {
-    const id = 'g_' + Math.random().toString(36).substr(2, 5).toUpperCase();
-    const updated = [...(local.general_types || []), { id, label: '신규 휴가 종류', days: 1, period: 'month' as const }];
-    set('general_types', updated);
-  };
-  
-  const updGeneral = (id: string, patch: any) => {
-    const updated = local.general_types.map(g => g.id === id ? { ...g, ...patch } : g);
-    set('general_types', updated);
-  };
-  
-  const delGeneral = (id: string) => {
-    const updated = local.general_types.filter(g => g.id !== id);
-    set('general_types', updated);
-  };
-
-  const addFamily = () => {
-    const id = 'f_' + Math.random().toString(36).substr(2, 5).toUpperCase();
-    const updated = [...(local.family_types || []), { id, label: '신규 경조사 휴가', days: 1 }];
-    set('family_types', updated);
-  };
-  
-  const updFamily = (id: string, patch: any) => {
-    const updated = local.family_types.map(f => f.id === id ? { ...f, ...patch } : f);
-    set('family_types', updated);
-  };
-  
-  const delFamily = (id: string) => {
-    const updated = local.family_types.filter(f => f.id !== id);
-    set('family_types', updated);
-  };
-
-  const promote = async (empId: string) => {
-    if (!empId) return;
-    try {
-      const res = await employeeAPI.updateEmployee(empId, { role: 'admin' });
-      if (res.success) {
-        alert('관리자 지정이 완료되었습니다.');
-        onSave();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message);
-    }
-  };
-
-  const demote = async (empId: string) => {
-    if (confirm('이 직원의 인사관리자 권한을 해제하시겠습니까?')) {
-      try {
-        const res = await employeeAPI.updateEmployee(empId, { role: 'employee' });
-        if (res.success) {
-          alert('관리자 권한이 해제되었습니다.');
-          onSave();
-        }
-      } catch (err: any) {
-        alert(err.response?.data?.message);
-      }
-    }
-  };
-
-  return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--gray-900)' }}>회사 및 휴가 운영 규정 설정</h2>
-
-      {/* Two-column: left=기본인적사항, right=연차설정 stacked */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1.1fr)', gap: '1.25rem', alignItems: 'start' }}>
-        {/* LEFT: Basic Info */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Building size={16} /> 회사 기본 인적사항
-          </h3>
-          <div className="input-group">
-            <label className="input-label">회사 ID</label>
-            <input type="text" value={local.id} disabled className="input-field" style={{ background: '#f8fafc', fontWeight: 600 }} />
-          </div>
-          <div className="input-group">
-            <label className="input-label">회사명</label>
-            <input type="text" value={local.name} onChange={e => set('name', e.target.value)} className="input-field" />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="input-group">
-              <label className="input-label">사업자등록번호</label>
-              <input type="text" value={local.biz_reg_no || ''} onChange={e => set('biz_reg_no', formatBizRegNo(e.target.value))} className="input-field" placeholder="000-00-00000" />
-            </div>
-            <div className="input-group">
-              <label className="input-label">대표 연락처</label>
-              <input type="text" value={local.phone || ''} onChange={e => set('phone', formatPhone(e.target.value))} className="input-field" placeholder="02-000-0000" />
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="input-group">
-              <label className="input-label">업태</label>
-              <input type="text" value={local.biz_type || ''} onChange={e => set('biz_type', e.target.value)} className="input-field" />
-            </div>
-            <div className="input-group">
-              <label className="input-label">업종</label>
-              <input type="text" value={local.biz_category || ''} onChange={e => set('biz_category', e.target.value)} className="input-field" />
-            </div>
-          </div>
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">본사 주소</label>
-            <input type="text" value={local.address || ''} onChange={e => set('address', e.target.value)} className="input-field" />
-          </div>
-        </div>
-
-        {/* RIGHT: Calculation basis + Leave Disposal stacked */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Calculation basis */}
-          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <CalendarIcon size={16} /> 연차 계산 시점 기준 설정
-            </h3>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">기준 시점 구분</label>
-              <select 
-                value={local.basis_type} 
-                onChange={e => set('basis_type', e.target.value as any)} 
-                className="input-field"
-              >
-                <option value="join">입사일 기준 (직원 개개인 기준)</option>
-                <option value="fiscal">회계연도 기준 (매년 1월 1일 일괄 부여)</option>
-                <option value="custom">지정일 기준 (특정 기산일 설정)</option>
-              </select>
-            </div>
-            
-            {local.basis_type === 'custom' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">기산일 월</label>
-                  <select 
-                    value={local.basis_date?.split('-')[0] || '01'} 
-                    onChange={e => set('basis_date', `${e.target.value}-${local.basis_date?.split('-')[1] || '01'}`)} 
-                    className="input-field"
-                  >
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const m = String(i + 1).padStart(2, '0');
-                      return <option key={m} value={m}>{i + 1}월</option>;
-                    })}
-                  </select>
-                </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">기산일 일</label>
-                  <select 
-                    value={local.basis_date?.split('-')[1] || '01'} 
-                    onChange={e => set('basis_date', `${local.basis_date?.split('-')[0] || '01'}-${e.target.value}`)} 
-                    className="input-field"
-                  >
-                    {Array.from({ length: 28 }, (_, i) => {
-                      const d = String(i + 1).padStart(2, '0');
-                      return <option key={d} value={d}>{i + 1}일</option>;
-                    })}
-                  </select>
-                </div>
-              </div>
-            )}
-            
-            <div style={{ padding: '10px 12px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 8, fontSize: 11, lineHeight: 1.5, border: '1px solid var(--primary-border)50' }}>
-              <strong>💡 기준 변경 시 영향</strong><br />
-              기준 구분을 변경하면 소속 임직원의 연차 가용 일수가 즉시 새 공식에 따라 실시간으로 재산출됩니다.
-            </div>
-          </div>
-
-          {/* Leave Disposal Policy */}
-          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileText size={16} /> 잔여 연차 처분 방식 설정
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { value: 'expire', label: '소멸', desc: '주기 종료 시 남은 연차 소멸. 초과 사용 부채는 다음 주기에서 선차감 정산.' },
-                { value: 'carryover', label: '이월', desc: '남은 연차를 다음 주기에 합산. 이월분 우선 사용, 부채는 선차감 정산.' },
-                { value: 'allowance', label: '수당', desc: '남은 연차를 수당으로 지급. (수당 태그 표시)' },
-              ].map(opt => (
-                <label
-                  key={opt.value}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: `1.5px solid ${(local.leave_disposal ?? 'expire') === opt.value ? 'var(--primary)' : 'var(--gray-200)'}`,
-                    background: (local.leave_disposal ?? 'expire') === opt.value ? 'var(--primary-light)' : '#fff',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="leave_disposal"
-                    value={opt.value}
-                    checked={(local.leave_disposal ?? 'expire') === opt.value}
-                    onChange={() => set('leave_disposal', opt.value as any)}
-                    style={{ marginTop: 2, flexShrink: 0 }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--gray-900)', marginBottom: 2 }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.5 }}>{opt.desc}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div style={{ padding: '10px 12px', background: '#FFFBEB', color: '#92400E', borderRadius: 8, fontSize: 11, lineHeight: 1.5, border: '1px solid #FDE68A' }}>
-              <strong>⚠️ 주의</strong><br />
-              처분 방식은 주기가 완전히 종료된 시점에 적용됩니다. 초과 사용 부채는 모든 모드에서 다음 주기 선차감으로 정산됩니다.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* General Company Leaves */}
-      <div className="glass-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FileText size={16} /> 회사 부여 일반 포상/유급 휴가 종류 설정
-          </h3>
-          <button className="btn" onClick={addGeneral} style={{ padding: '4px 10px', fontSize: 11, gap: 4 }}>
-            <Plus size={12} /> 추가
-          </button>
-        </div>
-        
-        {local.general_types.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--gray-400)', fontSize: 13 }}>설정된 회사 일반 휴가가 없습니다.</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {local.general_types.map(g => (
-              <div key={g.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <input 
-                  type="text" 
-                  value={g.label} 
-                  onChange={e => updGeneral(g.id, { label: e.target.value })} 
-                  className="input-field" 
-                  style={{ flex: 1 }} 
-                />
-                <input 
-                  type="number" 
-                  step="0.5" 
-                  value={g.days} 
-                  onChange={e => updGeneral(g.id, { days: parseFloat(e.target.value) || 0 })} 
-                  className="input-field" 
-                  style={{ width: 90 }} 
-                />
-                <span style={{ fontSize: 13, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>일 / 월 한도</span>
-                <button className="btn btn-danger" onClick={() => delGeneral(g.id)} style={{ padding: '6px 12px' }}>
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Family Event Leaves */}
-      <div className="glass-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Briefcase size={16} /> 경조사 휴가 일수 세부 설정
-          </h3>
-          <button className="btn" onClick={addFamily} style={{ padding: '4px 10px', fontSize: 11, gap: 4 }}>
-            <Plus size={12} /> 추가
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
-          {local.family_types.map(f => (
-            <div key={f.id} style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#f8fafc', padding: 8, borderRadius: 8, border: '1px solid var(--gray-200)' }}>
-              <input 
-                type="text" 
-                value={f.label} 
-                onChange={e => updFamily(f.id, { label: e.target.value })} 
-                className="input-field" 
-                style={{ flex: 1, padding: '6px 10px', fontSize: 12 }} 
-              />
-              <input 
-                type="number" 
-                value={f.days} 
-                onChange={e => updFamily(f.id, { days: parseInt(e.target.value) || 0 })} 
-                className="input-field" 
-                style={{ width: 60, padding: '6px 10px', fontSize: 12 }} 
-              />
-              <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>일</span>
-              <button className="btn btn-danger" onClick={() => delFamily(f.id)} style={{ padding: '6px 10px' }}>
-                <X size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Legal & Default Leaves */}
-      <div className="glass-card">
-        <div style={{ borderBottom: '1px solid var(--gray-200)', paddingBottom: 8, marginBottom: 14 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Shield size={16} /> 기본 제공 법정휴가 종류 및 명칭 설정
-          </h3>
-          <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
-            연차 이외의 법정 휴가를 활성화/비활성화하고, 각 휴가의 명칭을 변경할 수 있습니다.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {BASE_LEAVE_TYPES.filter(b => b.id !== 'annual').map(b => {
-            const isHidden = (local.hidden_base_types || []).includes(b.id);
-            const active = !isHidden;
-            const currentLabel = (local.base_type_labels && local.base_type_labels[b.id]) || b.label;
-
-            const toggleActive = () => {
-              let updatedHidden = [...(local.hidden_base_types || [])];
-              if (active) {
-                updatedHidden.push(b.id);
-              } else {
-                updatedHidden = updatedHidden.filter(id => id !== b.id);
-              }
-              setLocal(p => ({ ...p, hidden_base_types: updatedHidden }));
-            };
-
-            const changeLabel = (val: string) => {
-              const updatedLabels = { ...(local.base_type_labels || {}) };
-              updatedLabels[b.id] = val;
-              setLocal(p => ({ ...p, base_type_labels: updatedLabels }));
-            };
-
+        <nav
+          style={{
+            position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+            width: "100%", maxWidth: 520, background: T.sur, borderTop: `1px solid ${T.bdr}`,
+            display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom, 0px)"
+          }}>
+          {nav.map((n) => {
+            const active = view === n.id;
             return (
-              <div 
-                key={b.id} 
-                style={{ 
-                  display: 'flex', 
-                  gap: 12, 
-                  alignItems: 'center', 
-                  background: active ? '#f8fafc' : '#f1f5f9', 
-                  padding: '10px 12px', 
-                  borderRadius: 8, 
-                  border: `1px solid ${active ? 'var(--gray-200)' : 'var(--gray-300)'}`,
-                  opacity: active ? 1 : 0.65,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <input 
-                  type="checkbox" 
-                  checked={active}
-                  onChange={toggleActive}
-                  style={{ width: 16, height: 16, cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: 13, fontWeight: 600, width: 120, color: active ? 'var(--gray-800)' : 'var(--gray-400)' }}>
-                  기본: {b.label}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>→</span>
-                <input 
-                  type="text" 
-                  value={currentLabel} 
-                  disabled={!active}
-                  onChange={e => changeLabel(e.target.value)}
-                  placeholder={`${b.label} 노출 명칭`}
-                  className="input-field" 
-                  style={{ flex: 1, padding: '6px 10px', fontSize: 13, background: active ? '#fff' : '#e2e8f0', margin: 0 }} 
-                />
-                <span style={{ fontSize: 11, color: active ? 'var(--success)' : 'var(--gray-400)', fontWeight: 600 }}>
-                  {active ? '사용 중' : '사용 안함'}
-                </span>
-              </div>
+              <button
+                key={n.id}
+                onPointerDown={() => goView(n.id)}
+                style={{
+                  flex: 1, padding: "8px 2px 5px", border: "none", background: "none", cursor: "pointer",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                  touchAction: "manipulation", minHeight: 52
+                }}>
+                <span style={{ fontSize: nav.length > 5 ? 16 : 19, lineHeight: 1, opacity: active ? 1 : 0.5 }}>{n.ic}</span>
+                <span style={{ fontSize: nav.length > 5 ? 9 : 10, fontWeight: active ? 800 : 500, color: active ? T.text : T.muted }}>{n.l}</span>
+                {active && <div style={{ width: 4, height: 4, borderRadius: 99, background: T.text, marginTop: 1 }} />}
+              </button>
             );
           })}
-        </div>
+        </nav>
       </div>
-
-      {/* Admin promotion / demotion */}
-      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <h3 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Shield size={16} /> 인사 전결 권한자(인사 관리자) 지정
-          </h3>
-          <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>회사 설정 변경 및 사원 승인 처리가 가능한 직원을 지정합니다. (회사당 최대 3명)</p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {admins.map(a => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--gray-50)', borderRadius: 8, border: '1px solid var(--gray-200)' }}>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{a.name} <span style={{ color: 'var(--gray-400)', fontWeight: 500, fontSize: 12 }}>({a.email})</span></span>
-              {a.id !== currentUser.id ? (
-                <button className="btn" onClick={() => demote(a.id)} style={{ padding: '4px 8px', fontSize: 11 }}>권한 해제</button>
-              ) : (
-                <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>본인 (로그인 계정)</span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {admins.length < 3 && (
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">추가할 관리자 직원 선택</label>
-            <select 
-              value="" 
-              onChange={e => promote(e.target.value)} 
-              className="input-field"
-            >
-              <option value="">사원 선택...</option>
-              {nonAdmins.map(e => (
-                <option key={e.id} value={e.id}>{e.name} ({e.email}) — {e.department}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      <button className="btn btn-primary" onClick={save} disabled={isSaving} style={{ height: 44, fontSize: 14, fontWeight: 600 }}>
-        {isSaving ? '저장 중...' : '회사 운영 규정 전체 저장 적용'}
-      </button>
-    </div>
-  );
-}
-
-// ---------- Login / Register Screen ----------
-function LoginScreen({ companies, onLogin, onRegister }: {
-  companies: Array<{ id: string; name: string }>;
-  onLogin: (email: string, password?: string) => Promise<void> | void;
-  onRegister: (data: any) => Promise<void> | void;
-}) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [rememberEmail, setRememberEmail] = useState(() => {
-    return localStorage.getItem('remember_email') === 'true';
-  });
-  const [email, setEmail] = useState(() => {
-    return localStorage.getItem('saved_email') || '';
-  });
-  const [loginPassword, setLoginPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleLoginSubmit = async () => {
-    if (submitting) return;
-    if (!email.trim()) return alert('이메일 주소를 입력해 주세요.');
-    const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(email.trim())) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
-
-    if (rememberEmail) {
-      localStorage.setItem('saved_email', email);
-      localStorage.setItem('remember_email', 'true');
-    } else {
-      localStorage.removeItem('saved_email');
-      localStorage.removeItem('remember_email');
-    }
-    setSubmitting(true);
-    try {
-      await onLogin(email, loginPassword);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Registration form
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [joinDate, setJoinDate] = useState('');
-  const [dept, setDept] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [companySearch, setCompanySearch] = useState('');
-  const [selectedCompany, setSelectedCompany] = useState<{ id: string; name: string } | null>(null);
-  const [newCompanyName, setNewCompanyName] = useState('');
-
-  const filteredCompanies = useMemo(() => {
-    if (!companySearch) return [];
-    return companies.filter(c => 
-      c.name.toLowerCase().includes(companySearch.toLowerCase()) || 
-      c.id.toLowerCase().includes(companySearch.toLowerCase())
-    );
-  }, [companies, companySearch]);
-
-  const register = async () => {
-    if (submitting) return;
-    if (!name || !email || !joinDate || !password || !confirmPassword) return alert('이름, 이메일, 입사일, 비밀번호는 필수 입력사항입니다.');
-    const emailRegex = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(email.trim())) return alert('올바른 이메일 주소 형식이 아닙니다.\n예시: name@company.com');
-    const pwRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
-    if (!pwRegex.test(password)) return alert('비밀번호는 영문, 숫자 혼합 8자 이상이어야 합니다.');
-    if (password !== confirmPassword) return alert('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
-    if (!selectedCompany && !newCompanyName) return alert('회사를 선택하거나 새 회사명을 입력해주세요.');
-    
-    setSubmitting(true);
-    try {
-      await onRegister({
-        name,
-        email,
-        phone,
-        joinDate,
-        department: dept,
-        companyId: selectedCompany?.id,
-        newCompanyName: selectedCompany ? undefined : newCompanyName,
-        password,
-      });
-      setMode('login');
-      setEmail('');
-      setLoginPassword('');
-      setPassword('');
-      setConfirmPassword('');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-      <div className="animate-scale" style={{ width: '100%', maxWidth: 440 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24, fontWeight: 'bold', color: '#fff', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.25)' }}>✦</div>
-          <h1 style={{ fontWeight: 800, fontSize: 22, color: 'var(--gray-900)' }}>스마트 연차관리 웹서비스</h1>
-          <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 4 }}>대한민국 근로기준법 제60조 및 회계연도 기준 준수</p>
-        </div>
-
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--gray-200)', paddingBottom: 16, marginBottom: 20 }}>
-            <button 
-              onClick={() => setMode('login')} 
-              style={{ 
-                flex: 1, 
-                padding: '8px', 
-                border: 'none', 
-                background: mode === 'login' ? 'var(--primary-light)' : 'transparent', 
-                color: mode === 'login' ? 'var(--primary)' : 'var(--gray-500)', 
-                borderRadius: 8, 
-                fontSize: 14, 
-                fontWeight: 600, 
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              로그인
-            </button>
-            <button 
-              onClick={() => setMode('register')} 
-              style={{ 
-                flex: 1, 
-                padding: '8px', 
-                border: 'none', 
-                background: mode === 'register' ? 'var(--primary-light)' : 'transparent', 
-                color: mode === 'register' ? 'var(--primary)' : 'var(--gray-500)', 
-                borderRadius: 8, 
-                fontSize: 14, 
-                fontWeight: 600, 
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              회원가입
-            </button>
-          </div>
-
-          {mode === 'login' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">사내 이메일 주소</label>
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                  placeholder="name@company.com" 
-                  className="input-field" 
-                  onKeyDown={e => e.key === 'Enter' && handleLoginSubmit()}
-                />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">비밀번호</label>
-                <input 
-                  type="password" 
-                  value={loginPassword} 
-                  onChange={e => setLoginPassword(e.target.value)} 
-                  placeholder="••••••••" 
-                  className="input-field" 
-                  onKeyDown={e => e.key === 'Enter' && handleLoginSubmit()}
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0 4px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--gray-700)', cursor: 'pointer', userSelect: 'none' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={rememberEmail} 
-                    onChange={e => setRememberEmail(e.target.checked)} 
-                    style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: 15, height: 15 }} 
-                  />
-                  ID(이메일 주소) 저장
-                </label>
-              </div>
-              <button className="btn btn-primary" onClick={handleLoginSubmit} disabled={submitting} style={{ height: 44, fontSize: 14 }}>
-                {submitting ? '로그인 중...' : <>로그인 <ArrowRight size={16} /></>}
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '60vh', overflowY: 'auto', paddingRight: 4 }}>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">이름 *</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-field" placeholder="홍길동" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">이메일 주소 *</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input-field" placeholder="example@company.com" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">비밀번호 * (영문, 숫자 혼합 8자 이상)</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-field" placeholder="비밀번호 입력" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">비밀번호 확인 *</label>
-                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="input-field" placeholder="비밀번호 재입력" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">연락처</label>
-                <input type="text" value={phone} onChange={e => setPhone(formatPhone(e.target.value))} className="input-field" placeholder="010-0000-0000" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">입사일 *</label>
-                <input type="date" value={joinDate} onChange={e => setJoinDate(e.target.value)} className="input-field" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">소속 부서</label>
-                <input type="text" value={dept} onChange={e => setDept(e.target.value)} className="input-field" placeholder="인사팀, 개발팀 등" />
-              </div>
-              
-              <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: 14 }}>
-                <label className="input-label">소속 회사 지정 *</label>
-                <input 
-                  type="text" 
-                  value={companySearch} 
-                  onChange={e => { setCompanySearch(e.target.value); setSelectedCompany(null); }} 
-                  placeholder="회사명 또는 ID 검색..." 
-                  className="input-field" 
-                />
-                
-                {companySearch && filteredCompanies.length > 0 && (
-                  <div style={{ border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)', marginTop: 6, overflow: 'hidden', maxHeight: 150, overflowY: 'auto' }}>
-                    {filteredCompanies.map(c => (
-                      <div 
-                        key={c.id} 
-                        onClick={() => { setSelectedCompany(c); setCompanySearch(c.name); }} 
-                        style={{ 
-                          padding: '10px 12px', 
-                          cursor: 'pointer', 
-                          background: selectedCompany?.id === c.id ? 'var(--primary-light)' : '#fff', 
-                          borderBottom: '1px solid var(--gray-100)',
-                          fontSize: 13
-                        }}
-                      >
-                        <div style={{ fontWeight: 600 }}>{c.name}</div>
-                        <div style={{ fontSize: 10, color: 'var(--gray-500)' }}>ID: {c.id}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {companySearch && filteredCompanies.length === 0 && (
-                  <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid var(--gray-200)', marginTop: 8 }}>
-                    <div style={{ fontSize: 11, color: 'var(--gray-500)', marginBottom: 8 }}>
-                      등록된 회사가 없습니다. 아래에 새 회사명을 입력하시면 **신규 회사 등록 및 관리자 권한**으로 회원가입이 처리됩니다.
-                    </div>
-                    <input 
-                      type="text" 
-                      value={newCompanyName} 
-                      onChange={e => setNewCompanyName(e.target.value)} 
-                      placeholder="신규 등록할 회사명 입력" 
-                      className="input-field" 
-                    />
-                  </div>
-                )}
-              </div>
-
-              {selectedCompany && (
-                <div style={{ fontSize: 12, color: 'var(--success)', background: 'var(--success-light)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--success-border)50' }}>
-                  선택된 회사: <strong>{selectedCompany.name}</strong>
-                </div>
-              )}
-
-              <button className="btn btn-primary" onClick={register} disabled={submitting} style={{ height: 44, fontSize: 14, marginTop: 6 }}>
-                {submitting ? '가입 진행 중...' : '가입 완료 및 계정 생성'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    </ErrorBoundary>
   );
 }

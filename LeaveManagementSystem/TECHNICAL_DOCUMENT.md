@@ -83,6 +83,15 @@ graph TD
 | **27** | 대시보드 회사휴가/경조휴가 및 관리자/직원 전체 승인 휴가 표시 누락 수정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L426-L760) | ① `myCompanyEmps` 내 `role !== 'admin'` 필터 제거 ➔ 이광희 등 관리자 계정 승인 휴가 대시보드 누락 수정. ② 일반 직원 계정 캘린더 `allLeaves` 범위 확대 ➔ 회사휴가/경조휴가/동료 승인 휴가 캘린더 정상 표출. ③ 캘린더 범주 라벨 및 색상(Emerald/Amber/Indigo) 매칭 보정 |
 | **28** | 신규 직원 회원가입 관리자 승인제 구축 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L88-L100), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L226-L260), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1650-L1850) | ① 기존 회사 선택 회원가입 시 계정 상태 `pending(가입 승인 대기)`으로 세팅. ② 승인 대기 계정 로그인 시 차단 및 안내 문구 표출. ③ 대시보드 및 직원 관리 탭 내 **[가입 승인 대기 목록]** 신설 및 관리자 **[승인] / [거절]** 원클릭 지원 |
 | **29** | 1년 미만 연차 발생 방식 점진적 발생 → 선부여 방식 전환 | **완료** | [leaveCalc.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/utils/leaveCalc.ts#L123-L145) | 기존 매월 만근 시 1일씩 순차 발생(`Math.min(경과월수, 11)`) 방식을 **입사 당일 11일 전체 선부여** 방식으로 변경. 입사일 기준(join) 및 회계연도 기준(fiscal/custom) 모두 적용. 주기 라벨도 `'1년 미만 선부여 연차 (최대 11일)'`로 업데이트. 마이너스 잔여 연차 발생 원천 방지 (근로기준법 §60④ 실무 표준 적용) |
+| **30** | 반차→무급연차 변경 시 unit 1일 오표시 버그 수정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1354) | `LeaveHistory` 테이블에서 `exempt` 타입의 사용일 표시 시 `daysInRange()`로 날짜 범위 계산하던 로직을 `l.unit` 우선 표시로 수정. 반차(0.5일)를 무급연차로 변경 시 시작일=종료일이어서 `daysInRange()=1일`로 오계산되던 버그 해결. `unit > 0`인 경우 항상 `l.unit` 값을 표시하도록 보정 |
+| **31** | 회사설정 변경 후 기존 휴가 내역 유지 + 관리자 전체 타입 수정 권한 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L148-L165) | ① `allLeaveTypes` useMemo 추가: 비활성화된 타입 포함 전체 휴가 타입 목록(`isHidden` 플래그). ② `LeaveHistory`·`HistoryModal` 테이블에서 비활성 타입도 `allLeaveTypes`로 fallback 조회하여 라벨/색상 정상 표출 (설정 변경 후에도 기존 내역 유지). ③ `EditLeaveModal`에 `allLeaveTypes` prop 추가 → 관리자 수정 드롭다운에서 비활성 타입도 선택 가능. ④ `HistoryModal` 배치 변경 드롭다운도 `allLeaveTypes` 사용으로 관리자가 모든 타입으로 일괄 변경 가능. 비활성 항목은 `(비활성)` 배지로 구분 표시 |
+| **32** | 개별 승인·반려·취소·가입승인 버튼 중복 클릭 방지 (Double Submit Guard) | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1107) | `LeaveHistory`에 `actionLoadingId` state, `EmployeeMgmt`에 `regActionLoadingId` state 추가. API 호출 시작 시 해당 버튼 ID로 세팅 → `disabled={actionLoadingId !== null}` 적용 → `finally` 블록에서 반드시 초기화. 처리 중 버튼 텍스트를 `'처리 중...'`으로 실시간 표시하여 UX 개선 |
+| **35** | 이메일/숫자 입력란 유효성 검증 및 경고 메세지 강화 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | 로그인, 회원가입, 수동 직원 등록/수정 모달에 이메일 정규식 검증 탑재. 미부합 시 경고 알림 표출. 숫자 입력란(휴가 일수, 연락처, 사업자번호 등)에 문자/유효하지 않은 입력 시 경고 알림 및 처리 차단 |
+| **36** | 전 메뉴 폼 버튼 중복 동작 방지 (Double Submit Guard) | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | 로그인, 회원가입, 회사설정 저장, 직원 등록/수정 모달, 휴직 설정, 내역 수정/삭제 버튼에 로딩 상태(`disabled` 및 `'처리 중...'`)를 전면 적용하여 연달아 버튼 클릭 시 중복 처리 차단 |
+| **37** | 로그인/권한 제어 및 URL Hash 라우터 가드 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | `window.location.hash` 라우트 가드 구축. 비로그인 사용자 및 일반 사원의 권한 초과 URL Hash(`#employees`, `#settings` 등) 직접 입력 접근 시 차단, 알림창 표출 및 리다이렉트 처리 |
+| **38** | 테스트 가짜 데이터 점검 및 실시간 GAS API 전환 검증 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts) | 프론트엔드 코드 내 하드코딩된 데모 계정 및 가짜 모의 데이터 완전 소탕 확인. 모든 회사/직원/휴가 데이터는 Google Apps Script Web App(`GAS_URL`) 기반 실시간 실데이터 바인딩 유지 |
+| **39** | React SPA 내 커스텀 한국어 404 에러 안내 화면 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | SPA 내부에서 존재하지 않는 탭이나 주소 Hash 접근 시 친절한 한국어 404 안내 화면(`NotFoundScreen`) 노출 및 홈 화면 복귀 기능 제공 |
+| **40** | 스마트 엑셀/CSV/텍스트 복사-붙여넣기 대용량 휴가 일괄 등록 시스템 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx), [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts) | 엑셀 `Ctrl+C` ➔ `Ctrl+V` 붙여넣기 및 CSV/Excel 파싱 모달(`BulkImportModal`) 탑재. 사원명 자동 매칭, 연차/선지급/무급/반차 스마트 자동 분류, 실시간 미리보기 및 1클릭 일괄 승인 등록 지원 |
 
 ---
 
@@ -164,6 +173,35 @@ graph TD
      * **대시보드 상단 알림 배너**: 승인 대기 중인 임직원이 존재하는 경우 대시보드 상단에 🔔 알림 경고 카드를 표출합니다.
      * **직원 관리 탭 승인 대기 리스트 위젯**: **[가입 승인 대기 직원 목록]** 전용 섹션을 신설하여 신규 신청자의 이름, 이메일, 입사일, 부서 정보와 함께 **[승인]** 및 **[거절]** 버튼을 제공합니다.
      * **원클릭 결재 처리**: 관리자가 **[승인]** 클릭 시 `employeeAPI.updateEmployee(empId, { status: 'active' })`를 호출하여 계정을 즉시 활성화 처리합니다.
+
+### 4.9. 5대 안심 품질 및 보안 가드 구축 (5-Point Security & Validation Checklist)
+1. **잘못된 입력값 차단 (Strict Validation)**:
+   - 로그인 화면, 회원가입 화면 및 직원 수동 등록/수정 모달에 이메일 정규식(`emailRegex`) 검증을 적용하여 `name@company.com` 형식이 아닌 경우 경고 알림 메세지 표출.
+   - 회사 설정 및 휴가 신청 내 숫자 입력란(`days`, `unit` 등)에 문자 또는 음수가 입력되는 경우 경고 알림창을 표출하고 자동 보정/차단.
+2. **중복 동작 방지 (Double Submit Guard)**:
+   - 로그인, 회원가입, 회사 규정 저장, 직원 등록/수정, 휴직 설정, 내역 수정 및 삭제 등 전체 폼 제출 및 작업 버튼에 `submitting`, `isSaving`, `actionLoadingId` 로딩 상태 및 `disabled` 속성을 부여하여 실수로 클릭을 여러 번 연달아 하더라도 1회만 처리되도록 차단.
+3. **로그인/권한 제어 (URL Hash Router Guard)**:
+   - `useEffect` 기반 URL Hash 라우터 가드 구축: 비로그인 사용자가 `#employees`, `#settings` 등 주소를 직접 입력하여 접근 시 로그인 화면으로 리다이렉트 및 `"로그인이 필요한 서비스입니다."` 알림창 표출.
+   - 일반 임직원 계정이 관리자 전용 탭(`#employees`, `#settings`) 주소 직접 접근 시 대시보드(`/#dashboard`)로 리다이렉트 및 `"관리자 전용 페이지입니다. 접근 권한이 없습니다."` 차단 알림 표출.
+4. **진짜/가짜 데이터 전환 및 소탕 점검 (Mock-to-Real Transition Audit)**:
+   - 클라이언트 소스코드 내 테스트용 가짜 데모 계정 및 더미 데이터를 완전 소탕하여 Google Apps Script Web App (`GAS_URL`) 기반의 100% 라이브 DB 데이터만 서비스 화면에 표출됨을 검증 완료.
+5. **친절한 한국어 404 에러 안내 화면 (Custom 404 Page)**:
+   - GitHub Pages 레벨의 `public/404.html`뿐만 아니라 React SPA 내부에서도 존재하지 않는 탭/경로 Hash 입력 시 디자인 시스템이 적용된 친절한 한국어 404 안내 화면(`NotFoundScreen`)을 노출하고 홈 복귀 링크 제공.
+
+### 4.10. 스마트 엑셀/텍스트 일괄 등록 & 선지급/무급연차 자동 분류 시스템 (`BulkImportModal`)
+* **배경 및 요구사항**:
+  박유진 사원의 경우처럼 약 2년간에 걸쳐 67건(연차 31.5일, 무급 13.5일)에 달하는 대용량 과거 휴가 내역을 1건씩 수동 등록하는 번거로움을 해소하고, 연차 잔여 일수 초과 시 발생하는 선지급연차와 연차 차감 제외 무급연차를 자동으로 파싱 및 분류하여 한 번에 등록하기 위한 기능입니다.
+* **주요 기능 세부 사항**:
+  1. **엑셀 복사/붙여넣기(`Ctrl+C` ➔ `Ctrl+V`) 및 CSV/Excel 업로드 지원**:
+     - 엑셀 시트에서 `이름`, `날짜`, `일수`, `구분` 4개 컬럼을 복사하여 붙여넣으면 탭(`\t`) 및 줄바꿈(`\n`) 문자를 자동 구분하여 고속 파싱합니다.
+  2. **지능형 스마트 휴가 종류 자동 분류 파이프라인**:
+     - `연차`: 한도 내 차감 ➔ 한도 초과 시 **선지급연차(`unearned_annual`)** 및 차기 부채(`debtDays`)로 자동 전환 연동
+     - `무급`: **무급연차(`unpaid_annual`)**로 자동 전환 및 연차 잔여 일수 차감 제외(`exempt: true`)
+     - `0.5`: **반차(0.5일)**로 자동 인식
+  3. **사원명 자동 1:1 바인딩 및 오류 검출**:
+     - 소속 회사의 임직원 DB(`companyEmployees`)와 실시간 매칭하여 사원 ID 자동 할당 (사원명 불일치 시 주황색 경고 표출).
+  4. **1클릭 고속 일괄 승인 등록 (`applyBulkLeaves`)**:
+     - 과거 이력 데이터 특성에 맞추어 `approved` 승인 상태로 병렬 API 고속 등록 지원. 등록 직후 사원의 회차별 연차 잔여/초과/부채가 즉시 재산출됩니다.
 
 ---
 
