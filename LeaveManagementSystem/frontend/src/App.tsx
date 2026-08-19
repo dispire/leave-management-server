@@ -22,6 +22,7 @@ const DEPARTS = Object.freeze(["진료과", "간호부", "원무과", "수술실
 const POSITIONS = Object.freeze(["원장/의사", "수간호사", "간호사", "의료기사", "팀장", "사원"]);
 const PAGE_OPTS = Object.freeze([10, 20, 30, 50]);
 const LS_EMAIL = "__inv_email__";
+const LS_GAS_URL = "__inv_gas_url__";
 const TOAST_MS = 2400;
 const SKEL_MS = Object.freeze({ DASH: 200, PRODUCTS: 200, HISTORY: 180, MEMBERS: 180, COMPANY: 180 });
 const JSQR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
@@ -30,7 +31,7 @@ const VALID_VIEWS = new Set(Object.values(VIEW));
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-// 회사/원내 기본 정보 초기 데이터
+// 기본 초기 데이터
 const INIT_COMPANY = {
   name: "메디컬 원내 중앙재고센터",
   code: "HOSP-MED-01",
@@ -45,7 +46,6 @@ const INIT_COMPANY = {
   updatedAt: "2025-06-01",
 };
 
-// 직원/회원 관리 초기 데이터
 const INIT_USERS = [
   {
     id: 1,
@@ -73,36 +73,19 @@ const INIT_USERS = [
     status: "재직",
     createdAt: "2024-03-15",
   },
-  {
-    id: 3,
-    empNo: "EMP-003",
-    name: "이영희",
-    email: "yh.lee@company.com",
-    password: "user1234a",
-    phone: "010-5555-7777",
-    department: "수술실",
-    position: "수간호사",
-    role: ROLE.USER,
-    status: "재직",
-    createdAt: "2024-05-10",
-  },
 ];
 
-// 상품 정보 초기 데이터
 const INIT_PRODUCTS = [
   { id: 1, code: "PRD-001", name: "멸균 주사기 5ml (100개입)", category: "의료소모품", qty: 35, minQty: 10, unit: "박스", price: 25000, location: "A-01-02", barcodeType: "QR/1D", updatedAt: "2025-06-10" },
   { id: 2, code: "PRD-002", name: "디지털 체온계 (비접촉식)", category: "의료기기/장비", qty: 4, minQty: 8, unit: "개", price: 85000, location: "B-03-01", barcodeType: "QR/1D", updatedAt: "2025-06-11" },
   { id: 3, code: "PRD-003", name: "생리식염수 500ml", category: "의약품", qty: 120, minQty: 30, unit: "팩", price: 3200, location: "C-02-04", barcodeType: "QR/1D", updatedAt: "2025-06-12" },
   { id: 4, code: "PRD-004", name: "니트릴 장갑 L (200매)", category: "의료소모품", qty: 7, minQty: 15, unit: "곽", price: 18000, location: "A-02-05", barcodeType: "QR/1D", updatedAt: "2025-06-09" },
   { id: 5, code: "PRD-005", name: "손소독제 500ml", category: "일반소모품", qty: 3, minQty: 10, unit: "개", price: 6500, location: "D-01-01", barcodeType: "QR/1D", updatedAt: "2025-06-08" },
-  { id: 6, code: "PRD-006", name: "A4 복사용지 (500매)", category: "사무용품", qty: 50, minQty: 20, unit: "권", price: 7500, location: "E-01-03", barcodeType: "QR/1D", updatedAt: "2025-06-07" },
 ];
 
-// 입출고 이력 초기 데이터
 const INIT_HISTORY = [
   { id: 1, productCode: "PRD-001", productName: "멸균 주사기 5ml (100개입)", type: "입고", qty: 20, department: "간호부", by: "김관리", date: "2025-06-10", note: "정기 입고" },
   { id: 2, productCode: "PRD-002", productName: "디지털 체온계 (비접촉식)", type: "출고", qty: 2, department: "진료과", by: "홍길동", date: "2025-06-11", note: "진료실 배출" },
-  { id: 3, productCode: "PRD-003", productName: "생리식염수 500ml", type: "입고", qty: 50, department: "수술실", by: "김관리", date: "2025-06-12", note: "응급실 보충" },
 ];
 
 const BLANK_PRD = Object.freeze({
@@ -154,7 +137,6 @@ const V = Object.freeze({
   pname: (v: string) => (v ?? "").trim().length >= 2 ? "" : "상품명은 2자 이상이어야 합니다.",
   posInt: (v: any) => { const n = Number(v); return Number.isFinite(n) && Number.isInteger(n) && n >= 0 ? "" : "0 이상의 정수를 입력하세요."; },
   posNum: (v: any) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? "" : "0 이상의 숫자를 입력하세요."; },
-  phone: (v: string) => /^[0-9-]{8,15}$/.test((v ?? "").trim()) ? "" : "올바른 전화번호 형식이 아닙니다.",
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -171,6 +153,7 @@ const ls = Object.freeze({
 // ═══════════════════════════════════════════════════════════════
 function prdReducer(state: any[], action: any) {
   switch (action.type) {
+    case "SET_ALL": return action.payload;
     case "ADD": return [...state, { ...action.payload, id: Date.now(), updatedAt: today() }];
     case "UPDATE": return state.map((p) => (p.id === action.payload.id ? { ...action.payload, updatedAt: today() } : p));
     case "DELETE": return state.filter((p) => p.id !== action.id);
@@ -187,20 +170,22 @@ function prdReducer(state: any[], action: any) {
 function usrReducer(state: any[], action: any) {
   const adminCount = () => state.filter((u) => u.role === ROLE.ADMIN).length;
   switch (action.type) {
+    case "SET_ALL": return action.payload;
     case "ADD": return [...state, { ...action.payload, id: Date.now(), createdAt: today() }];
     case "UPDATE": return state.map((u) => (u.id === action.payload.id ? { ...u, ...action.payload } : u));
     case "DELETE":
       if (adminCount() === 1 && state.find((u) => u.id === action.id)?.role === ROLE.ADMIN) return state;
       return state.filter((u) => u.id !== action.id);
-    case "TOGGLE_ROLE":
-      if (adminCount() === 1 && state.find((u) => u.id === action.id)?.role === ROLE.ADMIN) return state;
-      return state.map((u) => (u.id === action.id ? { ...u, role: u.role === ROLE.ADMIN ? ROLE.USER : ROLE.ADMIN } : u));
     default: return state;
   }
 }
 
 function histReducer(state: any[], action: any) {
-  return action.type === "ADD" ? [...state, { ...action.payload, id: Date.now() }] : state;
+  switch (action.type) {
+    case "SET_ALL": return action.payload;
+    case "ADD": return [...state, { ...action.payload, id: Date.now() }];
+    default: return state;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -237,7 +222,7 @@ const INP = Object.freeze({
 const ROW = Object.freeze({ display: "flex", justifyContent: "space-between", alignItems: "center" });
 
 // ═══════════════════════════════════════════════════════════════
-// 7. 커스텀 훅
+// 7. 커스텀 훅 & 구글 드라이브 API 통신 함수
 // ═══════════════════════════════════════════════════════════════
 function useReady(ms = 220) {
   const [ok, setOk] = useState(false);
@@ -325,7 +310,7 @@ function decode1DBarcodePattern(imgData: ImageData): string | null {
     if (runs.length >= 25) {
       const match = runs.join("").match(/(1\d{4,12})/);
       if (match && match[1].length >= 8) {
-        return null; // fallback sentinel
+        return null;
       }
     }
   }
@@ -536,7 +521,6 @@ function LabelModal({ product, company, onClose }: { product: any; company: any;
           코드: <b>{product.code}</b> | 카테고리: {product.category} | 위치: {product.location || "미지정"}
         </p>
 
-        {/* QR 코드 렌더링 박스 */}
         <div style={{ display: "flex", justifyContent: "center", gap: 16, alignItems: "center", margin: "12px 0" }}>
           <div style={{ padding: 8, background: "#fff", border: `1px solid ${T.bdr}`, borderRadius: 8 }}>
             <img
@@ -547,7 +531,6 @@ function LabelModal({ product, company, onClose }: { product: any; company: any;
             <span style={{ fontSize: 10, color: T.muted, marginTop: 4, display: "block" }}>2D QR Code</span>
           </div>
 
-          {/* 1D 바코드 모의 visual */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             <div style={{ height: 50, display: "flex", alignItems: "center", gap: 2, padding: "4px 8px", background: "#fff", border: `1px solid ${T.bdr}`, borderRadius: 6 }}>
               {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 2, 4, 1, 2, 3, 1, 2].map((w, idx) => (
@@ -571,7 +554,7 @@ function LabelModal({ product, company, onClose }: { product: any; company: any;
 // ═══════════════════════════════════════════════════════════════
 // 11. 대시보드 뷰
 // ═══════════════════════════════════════════════════════════════
-const Dashboard = memo(function Dashboard({ products, history, company }: any) {
+const Dashboard = memo(function Dashboard({ products, history, company, isDriveConnected }: any) {
   const ready = useReady(SKEL_MS.DASH);
   const { low, recent } = useMemo(() => ({
     low: (products ?? []).filter((p: any) => (p.qty ?? 0) <= (p.minQty ?? 0)),
@@ -582,9 +565,14 @@ const Dashboard = memo(function Dashboard({ products, history, company }: any) {
   return (
     <div style={{ display: "grid", gap: 12, animation: "fadeUp .25s ease" }}>
       <Card accent={T.indigo}>
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ fontSize: 11, color: T.muted, fontWeight: 700 }}>원내 중앙 관리</span>
-          <h2 style={{ fontSize: 17, fontWeight: 900, margin: "2px 0 0", color: T.text }}>{company?.name || "메디컬 재고센터"}</h2>
+        <div style={{ ...ROW, marginBottom: 6 }}>
+          <div>
+            <span style={{ fontSize: 11, color: T.muted, fontWeight: 700 }}>원내 중앙 관리</span>
+            <h2 style={{ fontSize: 17, fontWeight: 900, margin: "2px 0 0", color: T.text }}>{company?.name || "메디컬 재고센터"}</h2>
+          </div>
+          <Badge color={isDriveConnected ? T.green : T.orange}>
+            {isDriveConnected ? "🟢 Google Drive DB 연동됨" : "🟡 로컬 저장 모드"}
+          </Badge>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.bdr}` }}>
           {[
@@ -830,7 +818,7 @@ const ProductsView = memo(function ProductsView({ products, company, dispatch, i
 ProductsView.displayName = "ProductsView";
 
 // ═══════════════════════════════════════════════════════════════
-// 13. 바코드 & QR 코드 스캔 뷰 (카메라 통합)
+// 13. 바코드 & QR 코드 스캔 뷰
 // ═══════════════════════════════════════════════════════════════
 function getCamErr(err: any) {
   const n = err?.name ?? "";
@@ -949,7 +937,6 @@ function ScanView({ products, company, prdDispatch, histDispatch, user }: any) {
           ctx.drawImage(v, 0, 0);
           const img = ctx.getImageData(0, 0, cv.width, cv.height);
 
-          // 1D 바코드 디코딩 시도 (BarcodeDetector API 지원 시)
           if ((window as any).BarcodeDetector) {
             const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "ean_13", "code_128", "code_39"] });
             detector.detect(v).then((barcodes: any[]) => {
@@ -961,11 +948,9 @@ function ScanView({ products, company, prdDispatch, histDispatch, user }: any) {
             }).catch(() => { });
           }
 
-          // 2D QR 코드 디코딩 (jsQR)
           const qr = jsqrRef.current?.(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
           if (qr?.data) { stopCamera(); handleFound(qr.data); return; }
 
-          // 1D 바코드 스캔라인 fallback 디코딩 시도
           const code1D = decode1DBarcodePattern(img);
           if (code1D) { stopCamera(); handleFound(code1D); return; }
         }
@@ -1450,17 +1435,68 @@ function CompanyView({ company, setCompany, isAdmin }: { company: any; setCompan
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 17. 설정 뷰
+// 17. 구글 드라이브 DB 연동 설정 뷰
 // ═══════════════════════════════════════════════════════════════
-function SettingsView({ pageSize, setPageSize }: { pageSize: number; setPageSize: (n: number) => void }) {
+function SettingsView({ pageSize, setPageSize, gasUrl, setGasUrl, onSyncFromDrive, onTestDriveConnection }: any) {
   const device = useDeviceInfo();
+  const [urlInput, setUrlInput] = useState(gasUrl);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [toastMsg, setToastMsg] = useState<any>(null);
+
+  const handleSaveUrl = async () => {
+    const cleanUrl = urlInput.trim();
+    setGasUrl(cleanUrl);
+    ls.set(LS_GAS_URL, cleanUrl);
+    setSyncing(true);
+    const res = await onTestDriveConnection(cleanUrl);
+    setSyncing(false);
+    if (res.ok) {
+      setToastMsg({ msg: "🟢 구글 드라이브 DB 연결 성공!", color: T.green });
+      onSyncFromDrive(cleanUrl);
+    } else {
+      setToastMsg({ msg: "🔴 구글 앱스 스크립트 연결 실패. URL을 확인하세요.", color: T.red });
+    }
+  };
+
   return (
     <div>
-      <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>시스템 설정</p>
+      {toastMsg && <Toast msg={toastMsg.msg} color={toastMsg.color} />}
+      <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>시스템 및 Google Drive DB 설정</p>
+
+      {/* 구글 드라이브 DB 연동 설정 카보 */}
+      <Card style={{ marginBottom: 12, borderLeft: `3.5px solid ${gasUrl ? T.green : T.orange}` }}>
+        <div style={{ ...ROW, marginBottom: 6 }}>
+          <SLabel>Google Drive / Sheets DB 연동</SLabel>
+          <Badge color={gasUrl ? T.green : T.orange}>{gasUrl ? "🟢 연동됨" : "🟡 미연동 (Local Mode)"}</Badge>
+        </div>
+        <p style={{ fontSize: 12, color: T.sub, marginBottom: 12, lineHeight: 1.5 }}>
+          Google 스프레드시트를 백엔드 데이터베이스로 연동하여 실시간 데이터 저장 및 조회를 이용합니다.
+        </p>
+
+        <Field label="Google Apps Script Web App URL">
+          <input
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            placeholder="https://script.google.com/macros/s/.../exec"
+            style={{ ...INP, border: `1.5px solid ${T.bdr}`, fontSize: 13 }}
+          />
+        </Field>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <Btn variant="blue" full size="md" onPointerDown={handleSaveUrl} disabled={syncing}>
+            {syncing ? "⏳ 구글 시트 연결 중…" : "🔗 연동 저장 & 시트 데이터 불러오기"}
+          </Btn>
+          <Btn variant="ghost" size="md" onPointerDown={() => setShowCodeModal(true)}>
+            📜 GAS 가이드
+          </Btn>
+        </div>
+      </Card>
+
       <Card style={{ marginBottom: 10 }}>
         <SLabel>페이지당 목록 표시 개수</SLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {PAGE_OPTS.map((n) => (
+          {PAGE_OPTS.map((n: number) => (
             <button
               key={n}
               onPointerDown={() => setPageSize(n)}
@@ -1493,6 +1529,25 @@ function SettingsView({ pageSize, setPageSize }: { pageSize: number; setPageSize
           </p>
         )}
       </Card>
+
+      {showCodeModal && (
+        <Modal title="Google Apps Script (GAS) 연동 방법" onClose={() => setShowCodeModal(false)}>
+          <div style={{ fontSize: 13, color: T.sub, lineHeight: 1.7 }}>
+            <p><b>1단계:</b> 구글 드라이브(drive.google.com)에서 새 <b>Google 스프레드시트</b>를 만듭니다.</p>
+            <p><b>2단계:</b> 상단 메뉴 <b>[확장 프로그램] → [Apps Script]</b>를 선택합니다.</p>
+            <p><b>3단계:</b> 프로젝트 내 `google_apps_script.gs` 파일의 전체 코드를 붙여넣습니다.</p>
+            <p><b>4단계:</b> 우측 상단 <b>[배포] → [새 배포]</b> 선택:</p>
+            <ul style={{ margin: "4px 0", paddingLeft: 20 }}>
+              <li>유형: <b>웹 앱 (Web App)</b></li>
+              <li>액세스 권한: <b>모든 사용자 (Anyone)</b></li>
+            </ul>
+            <p><b>5단계:</b> 발급된 웹 앱 URL을 위 입력창에 붙여넣고 저장하세요!</p>
+          </div>
+          <Btn variant="primary" full size="lg" onPointerDown={() => setShowCodeModal(false)} style={{ marginTop: 14 }}>
+            확인 완료
+          </Btn>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -1635,6 +1690,7 @@ const NAV_USER = Object.freeze([
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [company, setCompany] = useState<any>(INIT_COMPANY);
+  const [gasUrl, setGasUrl] = useState<string>(() => ls.get(LS_GAS_URL));
   const [view, setView] = useState<any>(VIEW.DASH);
   const [pageSize, setPageSize] = useState<number>(20);
   const [products, prdDispatch] = useReducer(prdReducer, INIT_PRODUCTS);
@@ -1644,6 +1700,69 @@ export default function App() {
 
   const isAdmin = user?.role === ROLE.ADMIN;
   const nav = isAdmin ? NAV_ADMIN : NAV_USER;
+
+  // 구글 드라이브 DB 통신 헬퍼 함수
+  const testDriveConn = useCallback(async (targetUrl: string) => {
+    if (!targetUrl) return { ok: false };
+    try {
+      const res = await fetch(`${targetUrl}?action=ping`);
+      const data = await res.json();
+      return { ok: data.status === "success" };
+    } catch (err) {
+      return { ok: false };
+    }
+  }, []);
+
+  const syncFromDrive = useCallback(async (targetUrl?: string) => {
+    const url = targetUrl || gasUrl;
+    if (!url) return;
+    try {
+      const res = await fetch(`${url}?action=readAll`);
+      const data = await res.json();
+      if (data.status === "success") {
+        if (data.company) setCompany(data.company);
+        if (data.products && data.products.length) prdDispatch({ type: "SET_ALL", payload: data.products });
+        if (data.users && data.users.length) usrDispatch({ type: "SET_ALL", payload: data.users });
+        if (data.history && data.history.length) histDispatch({ type: "SET_ALL", payload: data.history });
+      }
+    } catch (err) {
+      console.warn("Google Drive DB fetch error:", err);
+    }
+  }, [gasUrl]);
+
+  const pushToDrive = useCallback(async (payload: any) => {
+    if (!gasUrl) return;
+    try {
+      await fetch(gasUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.warn("Google Drive DB push error:", err);
+    }
+  }, [gasUrl]);
+
+  // 최초 로드 시 구글 드라이브 동기화
+  useEffect(() => {
+    if (gasUrl) syncFromDrive(gasUrl);
+  }, []);
+
+  // 상태 변경 시 구글 드라이브에 자동 푸시
+  const wrappedPrdDispatch = useCallback((action: any) => {
+    prdDispatch(action);
+    setTimeout(() => {
+      pushToDrive({ action: "saveAll", products, users, history, company });
+    }, 300);
+  }, [products, users, history, company, pushToDrive]);
+
+  const wrappedHistDispatch = useCallback((action: any) => {
+    histDispatch(action);
+    setTimeout(() => {
+      pushToDrive({ action: "saveAll", products, users, history, company });
+    }, 300);
+  }, [products, users, history, company, pushToDrive]);
 
   const logout = useCallback(() => { setUser(null); setView(VIEW.DASH); }, []);
   const goView = useCallback((v: string) => startTx(() => setView(v)), [startTx]);
@@ -1657,11 +1776,11 @@ export default function App() {
   const renderView = () => {
     switch (view) {
       case VIEW.DASH:
-        return <Dashboard products={products} history={history} company={company} />;
+        return <Dashboard products={products} history={history} company={company} isDriveConnected={!!gasUrl} />;
       case VIEW.PRODUCTS:
-        return <ProductsView products={products} company={company} dispatch={prdDispatch} isAdmin={isAdmin} pageSize={pageSize} />;
+        return <ProductsView products={products} company={company} dispatch={wrappedPrdDispatch} isAdmin={isAdmin} pageSize={pageSize} />;
       case VIEW.SCAN:
-        return <ScanView products={products} company={company} prdDispatch={prdDispatch} histDispatch={histDispatch} user={user} />;
+        return <ScanView products={products} company={company} prdDispatch={wrappedPrdDispatch} histDispatch={wrappedHistDispatch} user={user} />;
       case VIEW.HISTORY:
         return <HistoryView history={history} pageSize={pageSize} />;
       case VIEW.MEMBERS:
@@ -1669,9 +1788,18 @@ export default function App() {
       case VIEW.COMPANY:
         return <CompanyView company={company} setCompany={setCompany} isAdmin={isAdmin} />;
       case VIEW.SETTINGS:
-        return <SettingsView pageSize={pageSize} setPageSize={setPageSize} />;
+        return (
+          <SettingsView
+            pageSize={pageSize}
+            setPageSize={setPageSize}
+            gasUrl={gasUrl}
+            setGasUrl={setGasUrl}
+            onSyncFromDrive={syncFromDrive}
+            onTestDriveConnection={testDriveConn}
+          />
+        );
       default:
-        return <Dashboard products={products} history={history} company={company} />;
+        return <Dashboard products={products} history={history} company={company} isDriveConnected={!!gasUrl} />;
     }
   };
 
