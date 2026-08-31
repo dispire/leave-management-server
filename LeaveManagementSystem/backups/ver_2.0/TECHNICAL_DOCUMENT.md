@@ -8,20 +8,11 @@
 * **시스템명:** 직원 연차관리시스템 (Leave Management System)
 * **목적:** 기업 내 임직원의 연차 가용 일수를 실시간 계산하고, 다양한 휴가 신청 및 결재 절차를 효율적으로 관리
 * **배포 모델:** GitHub Pages를 통한 정적 웹 호스팅 및 Google Apps Script(GAS) API 연동
-* **최신 백업 버젼:** **`ver 2.0`** (Git Tag: `v2.0`, 로컬 백업: `backups/ver_2.0/`)
+* **최신 백업 버젼:** **`ver 1.5`** (Git Tag: `v1.5`, 로컬 백업: `backups/ver_1.5/`)
 
 ---
 
 ## 1.1. 버전 백업 이력 (Release Backup History)
-
-### 📌 `ver 2.0` (2026-08-31 직원 실배포 버전 백업 완료)
-- **Git 태그:** `v2.0` (GitHub Remote Push 완료)
-- **로컬 백업 경로:** [backups/ver_2.0/](file:///f:/Antigravity/LeaveManagementSystem/backups/ver_2.0/)
-- **주요 포함 기능 및 완성 내역:**
-  1. **전체 기능 40종 검증 완료 및 통합 안정화**: 1년 미만 선부여 방식 전환, 스마트 엑셀/CSV 일괄 등록 시스템(`BulkImportModal`), 가입 승인제 UI 탑재
-  2. **안심 보안 및 유효성 검증 체계**: 이메일/숫자 엄격 정규식 검증, Double Submit Guard, Hash 라우터 가드, 커스텀 404 에러 화면
-  3. **실시간 GAS API 바인딩 검증**: 데모 더미 데이터 전면 소탕 및 100% Google Apps Script DB 연동 검증
-  4. **운영 준비 완료**: 실 임직원 배포용 정적 빌드 및 GitHub Pages (`https://dispire.github.io/leave-management-server/`) 운영 서버 배포 준비
 
 ### 📌 `ver 1.5` (2026-08-05 백업 완료)
 - **Git 태그:** `v1.5` (GitHub Remote Push 완료)
