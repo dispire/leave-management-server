@@ -101,6 +101,7 @@ graph TD
 | **38** | 테스트 가짜 데이터 점검 및 실시간 GAS API 전환 검증 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts) | 프론트엔드 코드 내 하드코딩된 데모 계정 및 가짜 모의 데이터 완전 소탕 확인. 모든 회사/직원/휴가 데이터는 Google Apps Script Web App(`GAS_URL`) 기반 실시간 실데이터 바인딩 유지 |
 | **39** | React SPA 내 커스텀 한국어 404 에러 안내 화면 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | SPA 내부에서 존재하지 않는 탭이나 주소 Hash 접근 시 친절한 한국어 404 안내 화면(`NotFoundScreen`) 노출 및 홈 화면 복귀 기능 제공 |
 | **40** | 스마트 엑셀/CSV/텍스트 복사-붙여넣기 대용량 휴가 일괄 등록 시스템 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx), [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts) | 엑셀 `Ctrl+C` ➔ `Ctrl+V` 붙여넣기 및 CSV/Excel 파싱 모달(`BulkImportModal`) 탑재. 사원명 자동 매칭, 연차/선지급/무급/반차 스마트 자동 분류, 실시간 미리보기 및 1클릭 일괄 승인 등록 지원 |
+| **41** | 대시보드 휴가 캘린더 요일 시작 기준 변경 (월~일 ➔ 일~토) | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L565-L577), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L816) | 대시보드 휴가 캘린더 요일 헤더 및 날짜 그리드를 기존 월화수목금토일 형태에서 일월화수목금토(일요일 시작) 형태 및 6주차 동적 셀 확장 반영 |
 
 ---
 
@@ -211,6 +212,17 @@ graph TD
      - 소속 회사의 임직원 DB(`companyEmployees`)와 실시간 매칭하여 사원 ID 자동 할당 (사원명 불일치 시 주황색 경고 표출).
   4. **1클릭 고속 일괄 승인 등록 (`applyBulkLeaves`)**:
      - 과거 이력 데이터 특성에 맞추어 `approved` 승인 상태로 병렬 API 고속 등록 지원. 등록 직후 사원의 회차별 연차 잔여/초과/부채가 즉시 재산출됩니다.
+
+### 4.11. 대시보드 휴가 캘린더 일월화수목금토(일요일 시작) 형태 변경 (Sunday-first Calendar Grid)
+* **배경 및 요구사항**:
+  대시보드의 휴가 캘린더가 기존 월요일 시작(월화수목금토일)으로 구성되어 있어 일반적인 한국어 달력(일요일 시작: 일월화수목금토)과 일치하지 않는 사용자 경험을 개선하고자 요일 시작 기준 변경을 반영하였습니다.
+* **구현 세부 사항**:
+  1. **캘린더 요일 헤더 배열 변경**:
+     - 요일 헤더 배열을 `['일','월','화','수','목','금','토']`로 세팅.
+     - 일요일(index 0)은 Red(`var(--danger)`), 토요일(index 6)은 Blue(`#2563eb`), 평일은 Gray(`var(--gray-500)`) 스타일링을 적용하여 시각적 직관성을 향상.
+  2. **`monthCells` 계산 로직 보정**:
+     - 달의 첫 날(`new Date(y, m, 1)`)의 `getDay()` (일요일: 0 ~ 토요일: 6)를 직접 `startOffset`으로 지정하여 첫 주 일요일부터 시작하도록 산출.
+     - 31일 달이 금/토요일에 시작하는 경우 5주(35셀) 초과 시 날짜 누락을 방지하도록 `(startOffset + daysInMonth > 35) ? 42 : 35`로 총 셀 개수를 동적 확장.
 
 ---
 

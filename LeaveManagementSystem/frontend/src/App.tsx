@@ -565,11 +565,12 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
   const monthCells = useMemo(() => {
     const y = viewDate.getFullYear(), m = viewDate.getMonth();
     const first = new Date(y, m, 1);
-    // Find the Monday of the week containing first day of month
-    const firstDayOfWeek = first.getDay(); // Sunday = 0, Monday = 1...
-    const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Days from Monday
+    // Find the Sunday of the week containing first day of month
+    const startOffset = first.getDay(); // Sunday = 0, Monday = 1, ..., Saturday = 6
     const start = new Date(y, m, 1 - startOffset);
-    return Array.from({ length: 35 }, (_, i) => {
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const totalCells = (startOffset + daysInMonth > 35) ? 42 : 35;
+    return Array.from({ length: totalCells }, (_, i) => {
       const d = new Date(start); 
       d.setDate(start.getDate() + i); 
       return d;
@@ -813,8 +814,8 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
         <div className="calendar-container">
           <div className="calendar-inner">
             <div className="calendar-grid" style={{ marginBottom: 6 }}>
-              {['월','화','수','목','금','토','일'].map(d => (
-                <div key={d} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', padding: '6px 0', borderBottom: '1px solid var(--gray-200)' }}>
+              {['일','월','화','수','목','금','토'].map((d, idx) => (
+                <div key={d} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: idx === 0 ? 'var(--danger)' : idx === 6 ? '#2563eb' : 'var(--gray-500)', padding: '6px 0', borderBottom: '1px solid var(--gray-200)' }}>
                   {d}
                 </div>
               ))}
