@@ -296,7 +296,7 @@ export const leaveAPI = {
       const cached = cache.get<Leave[]>(key);
       if (cached) leaves = cached;
     }
-    if (!leaves || leaves.length === 0) {
+    if (!leaves || leaves.length === 0 || bypassCache) {
       const res = await makeGASRequest<Leave[]>('getLeaves', {
         companyId: user.company_id,
         empId: user.id,
@@ -304,6 +304,24 @@ export const leaveAPI = {
       });
       leaves = Array.isArray(res) ? res : [];
       cache.set(key, leaves);
+
+      // 백엔드 실데이터 동기화: 백엔드 상태가 승인/반려(approved/rejected) 처리되었거나 동기화된 항목은 local override 정리
+      const overrides = getLeaveOverrides();
+      let hasChanges = false;
+      leaves.forEach(item => {
+        const ov = overrides[item.id];
+        if (ov) {
+          if (ov.status && (ov.status === item.status || item.status === 'approved' || item.status === 'rejected')) {
+            delete overrides[item.id];
+            hasChanges = true;
+          }
+        }
+      });
+      if (hasChanges) {
+        try {
+          localStorage.setItem(OVERRIDES_STORAGE_KEY, JSON.stringify(overrides));
+        } catch {}
+      }
     }
     
     // Apply local overrides

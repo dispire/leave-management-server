@@ -184,7 +184,21 @@ export default function App() {
     }
     setTabState(newTab);
     if (newTab !== '404') window.location.hash = newTab;
+
+    // 탭 이동 시 백엔드 실시간 데이터 동기화 (다른 관리자가 결재/반려 처리한 건 즉시 반영)
+    if (newTab === 'history' || newTab === 'dashboard' || newTab === 'employees') {
+      loadAppData(true, false);
+    }
   };
+
+  // 30초마다 다중 관리자 간 결재/반려 상태 백그라운드 자동 동기화 (화면 차단 없이 실시간 갱신)
+  useEffect(() => {
+    if (screen !== 'app' || !currentUser) return;
+    const interval = setInterval(() => {
+      loadAppData(true, false);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [screen, currentUser]);
 
   // URL Hash Sync & Auth/Role Guard
   useEffect(() => {
@@ -207,6 +221,9 @@ export default function App() {
       }
       if (validTabs.includes(rawHash)) {
         setTabState(rawHash as any);
+        if (rawHash === 'history' || rawHash === 'dashboard' || rawHash === 'employees') {
+          loadAppData(true, false);
+        }
       } else {
         setTabState('404');
       }
