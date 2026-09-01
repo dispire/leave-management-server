@@ -18,7 +18,11 @@ import {
   ChevronLeft,
   ChevronRight,
   UserPlus,
-  CheckCircle
+  CheckCircle,
+  User,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 import { authAPI, companyAPI, employeeAPI, leaveAPI } from './api';
 import type { Employee, Company, Leave } from './api';
@@ -163,6 +167,7 @@ export default function App() {
   
   const [screen, setScreen] = useState<'login' | 'app'>('login');
   const [tab, setTabState] = useState<'dashboard' | 'apply' | 'history' | 'employees' | 'settings' | '404'>('dashboard');
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const setTab = (newTab: 'dashboard' | 'apply' | 'history' | 'employees' | 'settings' | '404') => {
     if (!currentUser && newTab !== '404') {
@@ -413,7 +418,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header user={currentUser} company={company} onLogout={logout} />
+      <Header user={currentUser} company={company} onLogout={logout} onEditProfile={() => setShowProfileModal(true)} />
       <NavBar tab={tab} setTab={setTab} isAdmin={isAdmin} />
       <main style={{ flex: 1, maxWidth: 1200, width: '100%', margin: '0 auto', padding: '2rem 1.5rem' }} className="animate-fade">
         {dataLoading ? (
@@ -435,12 +440,19 @@ export default function App() {
           </>
         )}
       </main>
+      {showProfileModal && currentUser && (
+        <EditProfileModal
+          currentUser={currentUser}
+          onClose={() => setShowProfileModal(false)}
+          onUpdate={() => loadAppData(true)}
+        />
+      )}
     </div>
   );
 }
 
 // ---------- Header ----------
-function Header({ user, company, onLogout }: { user: Employee | null; company: Company | null; onLogout: () => void }) {
+function Header({ user, company, onLogout, onEditProfile }: { user: Employee | null; company: Company | null; onLogout: () => void; onEditProfile: () => void }) {
   return (
     <header className="glass-nav" style={{ padding: '0 1.5rem', position: 'sticky', top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
@@ -455,12 +467,17 @@ function Header({ user, company, onLogout }: { user: Employee | null; company: C
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: 600, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div 
+            onClick={onEditProfile} 
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s ease' }}
+            title="개인 정보 수정 및 비밀번호 변경 모달 열기"
+            className="btn-ghost"
+          >
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: 600, fontSize: 12 }}>
               {user?.name[0]}
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>{user?.name}</div>
               <div style={{ fontSize: 10, color: 'var(--gray-500)', display: 'flex', alignItems: 'center', gap: 2 }}>
                 {user?.role === 'admin' ? <Shield size={10} style={{ color: 'var(--primary)' }} /> : null}
@@ -468,12 +485,392 @@ function Header({ user, company, onLogout }: { user: Employee | null; company: C
               </div>
             </div>
           </div>
+
+          <button 
+            className="btn btn-ghost" 
+            onClick={onEditProfile} 
+            style={{ padding: '6px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, borderColor: 'var(--gray-200)', background: '#fff' }}
+          >
+            <User size={14} style={{ color: 'var(--primary)' }} /> 내 정보 / 비밀번호 변경
+          </button>
+
           <button className="btn btn-ghost" onClick={onLogout} style={{ padding: '6px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
             <LogOut size={14} /> 로그아웃
           </button>
         </div>
       </div>
     </header>
+  );
+}
+
+// ---------- EditProfileModal (개인 정보 수정 및 비밀번호 확인/변경) ----------
+function EditProfileModal({ currentUser, onClose, onUpdate }: {
+  currentUser: Employee;
+  onClose: () => void;
+  onUpdate: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<'info' | 'password'>('info');
+
+  // 개인 정보 폼 상태
+  const [name, setName] = useState(currentUser.name || '');
+  const [phone, setPhone] = useState(currentUser.phone || '');
+  const [department, setDepartment] = useState(currentUser.department || '');
+  const [email, setEmail] = useState(currentUser.email || '');
+  const [isSavingInfo, setIsSavingInfo] = useState(false);
+
+  // 비밀번호 폼 상태
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<{ text: string; success: boolean } | null>(null);
+
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [isChangingPw, setIsChangingPw] = useState(false);
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{8,}$/;
+
+  const handleSaveInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return alert('성명을 입력해 주세요.');
+    if (!email.trim() || !emailRegex.test(email.trim())) return alert('올바른 이메일 주소를 입력해 주세요.');
+
+    setIsSavingInfo(true);
+    try {
+      const formattedPhone = formatPhone(phone);
+      const res = await employeeAPI.updateEmployee(currentUser.id, {
+        name: name.trim(),
+        phone: formattedPhone,
+        department: department.trim(),
+        email: email.trim(),
+      });
+      if (res.success) {
+        alert('개인 정보가 성공적으로 수정되었습니다.');
+        onUpdate();
+        onClose();
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || '개인 정보 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsSavingInfo(false);
+    }
+  };
+
+  const handleVerifyCurrentPassword = async () => {
+    if (!currentPassword) return alert('현재 비밀번호를 입력해 주세요.');
+    setIsVerifying(true);
+    setVerifyMsg(null);
+    try {
+      await authAPI.login(currentUser.email, currentPassword);
+      setIsVerified(true);
+      setVerifyMsg({ text: '현재 비밀번호가 확인되었습니다!', success: true });
+    } catch {
+      setIsVerified(false);
+      setVerifyMsg({ text: '현재 비밀번호가 일치하지 않습니다.', success: false });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) return alert('현재 비밀번호를 입력해 주세요.');
+    if (!newPassword) return alert('새 비밀번호를 입력해 주세요.');
+    if (!pwRegex.test(newPassword)) return alert('새 비밀번호는 영문, 숫자 혼합 8자 이상이어야 합니다.');
+    if (newPassword !== confirmPassword) return alert('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+
+    setIsChangingPw(true);
+    try {
+      if (!isVerified) {
+        try {
+          await authAPI.login(currentUser.email, currentPassword);
+        } catch {
+          alert('현재 비밀번호가 일치하지 않습니다.');
+          setIsChangingPw(false);
+          return;
+        }
+      }
+
+      const res = await employeeAPI.updateEmployee(currentUser.id, {
+        password: newPassword,
+      });
+
+      if (res.success) {
+        alert('비밀번호가 성공적으로 변경되었습니다.');
+        onUpdate();
+        onClose();
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || '비밀번호 변경 중 오류가 발생했습니다.');
+    } finally {
+      setIsChangingPw(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div className="glass-card animate-fade" style={{ width: '100%', maxWidth: 520, borderRadius: 'var(--radius-xl)', overflow: 'hidden', background: '#fff', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+        
+        {/* Header */}
+        <div style={{ padding: '1.25rem 1.5rem', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-900)', margin: 0 }}>내 정보 수정 및 비밀번호 변경</h3>
+              <p style={{ fontSize: 12, color: 'var(--gray-500)', margin: '2px 0 0' }}>{currentUser.name} ({currentUser.email})</p>
+            </div>
+          </div>
+          <button className="btn btn-ghost" onClick={onClose} style={{ padding: 6, borderRadius: 8 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--gray-200)', background: '#fff' }}>
+          <button
+            onClick={() => setActiveTab('info')}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              fontSize: 14,
+              fontWeight: activeTab === 'info' ? 600 : 500,
+              color: activeTab === 'info' ? 'var(--primary)' : 'var(--gray-500)',
+              borderBottom: activeTab === 'info' ? '2px solid var(--primary)' : '2px solid transparent',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8
+            }}
+          >
+            <User size={16} /> 개인 정보 수정
+          </button>
+          <button
+            onClick={() => setActiveTab('password')}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              fontSize: 14,
+              fontWeight: activeTab === 'password' ? 600 : 500,
+              color: activeTab === 'password' ? 'var(--primary)' : 'var(--gray-500)',
+              borderBottom: activeTab === 'password' ? '2px solid var(--primary)' : '2px solid transparent',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8
+            }}
+          >
+            <KeyRound size={16} /> 비밀번호 확인 및 변경
+          </button>
+        </div>
+
+        {/* Body Content */}
+        <div style={{ padding: '1.5rem', maxHeight: '75vh', overflowY: 'auto' }}>
+          {activeTab === 'info' ? (
+            <form onSubmit={handleSaveInfo} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>성명 *</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="성명 입력"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>이메일 (계정 ID) *</label>
+                <input
+                  type="email"
+                  className="input-field"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="example@company.com"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>연락처</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={phone}
+                    onChange={e => setPhone(formatPhone(e.target.value))}
+                    placeholder="010-0000-0000"
+                  />
+                </div>
+                <div>
+                  <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>소속 부서</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={department}
+                    onChange={e => setDepartment(e.target.value)}
+                    placeholder="부서명 입력"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--gray-50)', padding: '1rem', borderRadius: 8 }}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--gray-500)', display: 'block' }}>입사일 (관리자 지정)</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gray-900)' }}>{formatDateStr(currentUser.join_date)}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--gray-500)', display: 'block' }}>권한</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--primary)' }}>
+                    {currentUser.role === 'admin' ? '인사관리자' : '일반직원'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isSavingInfo}>취소</button>
+                <button type="submit" className="btn btn-primary" disabled={isSavingInfo}>
+                  {isSavingInfo ? '저장 중...' : '개인 정보 저장'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Current Password Verification */}
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '1rem', borderRadius: 10 }}>
+                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-800)' }}>
+                  1. 현재 비밀번호 입력 및 확인
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <input
+                      type={showCurrentPw ? 'text' : 'password'}
+                      className="input-field"
+                      value={currentPassword}
+                      onChange={e => {
+                        setCurrentPassword(e.target.value);
+                        setIsVerified(false);
+                        setVerifyMsg(null);
+                      }}
+                      placeholder="현재 비밀번호 입력"
+                      style={{ paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPw(!showCurrentPw)}
+                      style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-500)', padding: 4 }}
+                      title={showCurrentPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                    >
+                      {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={handleVerifyCurrentPassword}
+                    disabled={isVerifying || !currentPassword}
+                    style={{ whiteSpace: 'nowrap', fontSize: 12, borderColor: 'var(--gray-300)', background: '#fff' }}
+                  >
+                    {isVerifying ? '검증 중...' : '현재 비밀번호 확인'}
+                  </button>
+                </div>
+
+                {verifyMsg && (
+                  <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: verifyMsg.success ? '#16A34A' : '#DC2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {verifyMsg.success ? <CheckCircle size={14} /> : <ShieldAlert size={14} />}
+                    {verifyMsg.text}
+                  </div>
+                )}
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>
+                  2. 새 비밀번호 입력
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNewPw ? 'text' : 'password'}
+                    className="input-field"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="영문, 숫자 혼합 8자 이상"
+                    style={{ paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPw(!showNewPw)}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-500)', padding: 4 }}
+                    title={showNewPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                  >
+                    {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {newPassword && (
+                  <div style={{ marginTop: 4, fontSize: 11, color: pwRegex.test(newPassword) ? '#16A34A' : '#DC2626' }}>
+                    {pwRegex.test(newPassword) ? '✓ 사용 가능한 비밀번호 규칙입니다.' : '✕ 영문과 숫자를 조합하여 8자 이상 입력해 주세요.'}
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm New Password */}
+              <div>
+                <label className="input-label" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>
+                  3. 새 비밀번호 재입력 확인
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showConfirmPw ? 'text' : 'password'}
+                    className="input-field"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="새 비밀번호 다시 입력"
+                    style={{ paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPw(!showConfirmPw)}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-500)', padding: 4 }}
+                    title={showConfirmPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                  >
+                    {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {confirmPassword && (
+                  <div style={{ marginTop: 4, fontSize: 11, color: newPassword === confirmPassword ? '#16A34A' : '#DC2626' }}>
+                    {newPassword === confirmPassword ? '✓ 비밀번호가 일치합니다.' : '✕ 비밀번호가 일치하지 않습니다.'}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isChangingPw}>취소</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isChangingPw || !currentPassword || !newPassword || !confirmPassword || !pwRegex.test(newPassword) || newPassword !== confirmPassword}
+                >
+                  {isChangingPw ? '변경 중...' : '비밀번호 변경 적용'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

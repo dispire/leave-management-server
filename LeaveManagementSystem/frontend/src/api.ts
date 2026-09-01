@@ -97,6 +97,7 @@ export interface Employee {
   status: 'active' | 'resigned' | 'pending';
   leave_of_absence?: { start: string; end: string | null } | null;
   resign_date?: string | null;
+  password?: string;
 }
 
 export interface Leave {
@@ -242,7 +243,7 @@ export const employeeAPI = {
     }
     throw { response: { data: { message: res.message || '추가 실패' } } };
   },
-  updateEmployee: async (empId: string, data: Partial<Employee> & { leaveOfAbsence?: { start: string; end: string | null } | null; joinDate?: string }) => {
+  updateEmployee: async (empId: string, data: Partial<Employee> & { leaveOfAbsence?: { start: string; end: string | null } | null; joinDate?: string; password?: string }) => {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
     const res = await makeGASRequest<{ success: boolean; message?: string }>('updateEmployee', {
