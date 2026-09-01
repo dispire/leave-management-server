@@ -1261,8 +1261,8 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                     }}>
                       {d.getDate()}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {dayLeaves.slice(0, 3).map((l, li) => {
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 180, overflowY: 'auto' }}>
+                      {dayLeaves.map((l, li) => {
                         const lt = leaveTypes.find(x => x.id === l.type);
                         const labelText = lt?.label || (
                           l.type === 'pm_half' ? '오후반차' : 
@@ -1307,11 +1307,6 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
                           </div>
                         );
                       })}
-                      {dayLeaves.length > 3 && (
-                        <div style={{ fontSize: 9, color: 'var(--gray-500)', fontWeight: 600, paddingLeft: 4 }}>
-                          외 {dayLeaves.length - 3}명
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
