@@ -1366,7 +1366,7 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
     if (!startDate || !endDate) return alert('시작일과 종료일을 선택해주세요.');
     if (endDate < startDate) return alert('종료일은 시작일보다 빠를 수 없습니다.');
     let u: number;
-    if (isExempt || isFamily || isGeneral || startDate !== endDate) {
+    if (startDate !== endDate) {
       u = daysInRange(startDate, endDate);
     } else {
       u = parseFloat(unit);
@@ -1438,7 +1438,13 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
             onChange={e => { 
               const newType = e.target.value;
               setType(newType); 
-              if (newType === 'am_half' || newType === 'pm_half') {
+              const targetType = leaveTypes.find(t => t.id === newType);
+              if (
+                newType === 'am_half' || 
+                newType === 'pm_half' || 
+                targetType?.defaultUnit === 0.5 || 
+                targetType?.label?.includes('반차')
+              ) {
                 setUnit('0.5');
               } else {
                 setUnit('1');
@@ -1461,40 +1467,38 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
           </select>
         </div>
 
-        {!isExempt && !isFamily && (
-          <div className="input-group">
-            <label className="input-label">
-              사용 단위 {startDate && endDate && startDate !== endDate ? '(기간 지정 시 자동계산)' : ''}
-            </label>
-            {type === 'am_half' || type === 'pm_half' || selectedType?.defaultUnit === 0.5 ? (
-              <input
-                type="text"
-                disabled
-                value="0.5일 (반차 고정)"
-                className="input-field"
-                style={{ background: '#f1f5f9', color: 'var(--primary)', fontWeight: 700 }}
-              />
-            ) : startDate && endDate && startDate !== endDate ? (
-              <input
-                type="text"
-                disabled
-                value={`${calculatedDays}일 (${startDate} ~ ${endDate} 자동 산출)`}
-                className="input-field"
-                style={{ background: '#f1f5f9', color: 'var(--gray-700)', fontWeight: 600 }}
-              />
-            ) : (
-              <select 
-                value={unit} 
-                onChange={e => setUnit(e.target.value)} 
-                className="input-field"
-              >
-                <option value="1">1일 (종일)</option>
-                <option value="0.5">0.5일 (반차)</option>
-                <option value="0.25">0.25일 (반반차)</option>
-              </select>
-            )}
-          </div>
-        )}
+        <div className="input-group">
+          <label className="input-label">
+            사용 단위 {startDate && endDate && startDate !== endDate ? '(기간 지정 시 자동계산)' : ''}
+          </label>
+          {type === 'am_half' || type === 'pm_half' || selectedType?.defaultUnit === 0.5 || selectedType?.label?.includes('반차') ? (
+            <input
+              type="text"
+              disabled
+              value="0.5일 (반차 고정)"
+              className="input-field"
+              style={{ background: '#f1f5f9', color: 'var(--primary)', fontWeight: 700 }}
+            />
+          ) : startDate && endDate && startDate !== endDate ? (
+            <input
+              type="text"
+              disabled
+              value={`${calculatedDays}일 (${startDate} ~ ${endDate} 자동 산출)`}
+              className="input-field"
+              style={{ background: '#f1f5f9', color: 'var(--gray-700)', fontWeight: 600 }}
+            />
+          ) : (
+            <select 
+              value={unit} 
+              onChange={e => setUnit(e.target.value)} 
+              className="input-field"
+            >
+              <option value="1">1일 (종일)</option>
+              <option value="0.5">0.5일 (반차)</option>
+              <option value="0.25">0.25일 (반반차)</option>
+            </select>
+          )}
+        </div>
 
         {isExempt && (
           <div style={{ fontSize: 12, color: 'var(--warning)', background: 'var(--warning-light)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--warning-border)50', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2017,7 +2021,7 @@ function EditLeaveModal({ leave, leaveTypes, allLeaveTypes, onClose, onSave }: {
     const targetObj = effectiveLeaveTypes.find(t => t.id === newType);
     if (targetObj?.defaultUnit) {
       setUnit(targetObj.defaultUnit);
-    } else if (newType === 'am_half' || newType === 'pm_half') {
+    } else if (newType === 'am_half' || newType === 'pm_half' || targetObj?.label?.includes('반차')) {
       setUnit(0.5);
     }
   };
