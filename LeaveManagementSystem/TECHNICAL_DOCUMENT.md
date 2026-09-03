@@ -107,6 +107,7 @@ graph TD
 | **44** | 다중 관리자 간 결재/반려 실시간 백엔드 교차 동기화 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L185-L215), [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L290-L325) | 타 관리자가 승인/반려한 건이 다른 관리자 화면에서 '대기중'으로 지속되는 현상 해결. ① `getLeaves(true)` 우회 호출 시 로컬 구 오버라이드 자동 정제, ② 탭 이동 시 실시간 백엔드 DB 패치, ③ 30초 백그라운드 자동 동기화 적용 |
 | **45** | 대시보드 휴가 캘린더 전원 표출 시스템 구축 ('외 N명' 축약 제거) | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1261-L1310) | 기존 최대 3명 노출 후 '외 N명'으로 축약되던 제한을 해제하고 당일 전체 휴가 사원 배지를 100% 전원 표시하도록 개편. 셀 스크롤(maxHeight: 180px) 및 반응형 레이아웃 적용 |
 | **46** | 대시보드 휴가 캘린더 및 최근 승인 이력 전 계정 회사 전체 공유 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L300-L305), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | 일반 직원 로그인 시에도 대시보드 캘린더 및 최근 승인 이력 위젯에서 회사 전체 임직원의 승인된 휴가 일정을 공유하도록 수정 (상단 연차 소진 현황 및 신청 내역의 본인 한정 보안은 유지) |
+| **47** | 일괄 등록 모달 테스트용 샘플 텍스트 로드 버튼(박유진 사원 67건) 제거 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L3093-L3230) | 신청/승인관리 탭 일괄 등록 모달(`BulkImportModal`) 내 포함되어 있던 테스트용 '박유진 사원 67건 샘플 텍스트 로드' 버튼 및 함수를 완전 제거 |
 
 ---
 

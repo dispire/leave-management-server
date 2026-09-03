@@ -3090,77 +3090,6 @@ function BulkImportModal({ employees, leaveTypes, allLeaveTypes, onClose, onComp
     validItems.filter(i => i.isExempt).reduce((sum, i) => sum + i.unit, 0),
   [validItems]);
 
-  const loadParkSample = () => {
-    const sample = `박유진\t2024-09-19\t0.5\t연차
-박유진\t2024-09-23\t0.5\t연차
-박유진\t2024-10-21\t0.5\t연차
-박유진\t2024-11-14\t0.5\t연차
-박유진\t2024-11-18\t0.5\t연차
-박유진\t2024-11-20\t0.5\t연차
-박유진\t2024-11-21\t1.0\t연차
-박유진\t2024-11-27\t0.5\t연차
-박유진\t2025-01-04\t1.0\t연차
-박유진\t2025-02-27\t1.0\t연차
-박유진\t2025-02-28\t1.0\t연차
-박유진\t2025-01-08\t0.5\t연차
-박유진\t2025-01-24\t0.5\t연차
-박유진\t2025-03-19\t1.0\t연차
-박유진\t2025-03-29\t1.0\t연차
-박유진\t2025-05-13\t1.0\t연차
-박유진\t2025-05-19\t0.5\t연차
-박유진\t2025-05-22\t0.5\t연차
-박유진\t2025-05-29\t0.5\t연차
-박유진\t2025-06-18\t0.5\t연차
-박유진\t2025-07-19\t1.0\t연차
-박유진\t2025-07-22\t0.5\t연차
-박유진\t2025-07-29\t0.5\t연차
-박유진\t2025-08-18\t0.5\t연차
-박유진\t2025-08-23\t1.0\t연차
-박유진\t2025-08-26\t0.5\t연차
-박유진\t2025-08-30\t1.0\t연차
-박유진\t2025-09-08\t0.5\t연차
-박유진\t2025-09-10\t0.5\t연차
-박유진\t2025-09-12\t0.5\t연차
-박유진\t2025-09-16\t0.5\t연차
-박유진\t2025-10-10\t1.0\t연차
-박유진\t2025-10-11\t1.0\t연차
-박유진\t2025-09-26\t0.5\t연차
-박유진\t2025-10-20\t0.5\t연차
-박유진\t2025-10-24\t0.5\t연차
-박유진\t2025-10-27\t0.5\t연차
-박유진\t2025-10-30\t0.5\t연차
-박유진\t2025-11-24\t0.5\t연차
-박유진\t2026-02-26\t1.0\t연차
-박유진\t2026-02-27\t1.0\t연차
-박유진\t2026-03-03\t1.0\t연차
-박유진\t2026-01-30\t0.5\t연차
-박유진\t2026-02-06\t0.5\t연차
-박유진\t2026-03-04\t1.0\t무급
-박유진\t2026-03-05\t1.0\t무급
-박유진\t2026-03-06\t1.0\t무급
-박유진\t2026-04-15\t0.5\t무급
-박유진\t2026-04-20\t0.5\t무급
-박유진\t2026-04-21\t1.0\t무급
-박유진\t2026-04-22\t0.5\t무급
-박유진\t2026-05-04\t1.0\t무급
-박유진\t2026-04-30\t0.5\t무급
-박유진\t2026-05-09\t1.0\t무급
-박유진\t2026-05-18\t0.5\t무급
-박유진\t2026-05-20\t0.5\t무급
-박유진\t2026-05-29\t0.5\t연차
-박유진\t2026-06-10\t0.5\t무급
-박유진\t2026-06-18\t0.5\t무급
-박유진\t2026-06-22\t0.5\t무급
-박유진\t2026-06-26\t0.5\t무급
-박유진\t2026-07-18\t1.0\t무급
-박유진\t2026-08-18\t1.0\t연차
-박유진\t2026-08-19\t1.0\t연차
-박유진\t2026-07-13\t0.5\t무급
-박유진\t2026-07-22\t0.5\t무급
-박유진\t2026-08-03\t1.0\t연차`;
-    setRawText(sample);
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -3226,9 +3155,6 @@ function BulkImportModal({ employees, leaveTypes, allLeaveTypes, onClose, onComp
                 📁 CSV/텍스트 파일 선택
                 <input type="file" accept=".csv,.txt,.tsv" onChange={handleFileUpload} style={{ display: 'none' }} />
               </label>
-              <button className="btn" onClick={loadParkSample} style={{ padding: '6px 12px', fontSize: 12, borderColor: 'var(--primary-border)', color: 'var(--primary)', background: 'var(--primary-light)' }}>
-                ✦ 박유진 사원 67건 샘플 텍스트 로드
-              </button>
             </div>
             {parsedItems.length > 0 && (
               <button className="btn btn-ghost" onClick={() => setRawText('')} style={{ fontSize: 12, color: 'var(--gray-500)' }}>
@@ -3240,7 +3166,7 @@ function BulkImportModal({ employees, leaveTypes, allLeaveTypes, onClose, onComp
           <textarea 
             value={rawText}
             onChange={e => setRawText(e.target.value)}
-            placeholder={`엑셀에서 복사한 데이터를 여기에 붙여넣으세요 (Ctrl+V)\n\n예시 형식:\n박유진\t2024-09-19\t0.5\t연차\n박유진\t2026-03-04\t1.0\t무급`}
+            placeholder={`엑셀에서 복사한 데이터를 여기에 붙여넣으세요 (Ctrl+V)\n\n예시 형식:\n홍길동\t2024-09-19\t0.5\t연차\n홍길동\t2026-03-04\t1.0\t무급`}
             rows={6}
             className="input-field"
             style={{ fontFamily: 'monospace', fontSize: 12, padding: 12, lineHeight: 1.5 }}
