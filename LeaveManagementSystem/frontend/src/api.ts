@@ -300,7 +300,7 @@ export const leaveAPI = {
       const res = await makeGASRequest<Leave[]>('getLeaves', {
         companyId: user.company_id,
         empId: user.id,
-        role: user.role
+        role: 'admin' // Always fetch company-wide leaves so dashboard calendar & history widget can be shared across all accounts
       });
       leaves = Array.isArray(res) ? res : [];
       cache.set(key, leaves);

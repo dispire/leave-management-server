@@ -102,6 +102,11 @@ graph TD
 | **39** | React SPA 내 커스텀 한국어 404 에러 안내 화면 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | SPA 내부에서 존재하지 않는 탭이나 주소 Hash 접근 시 친절한 한국어 404 안내 화면(`NotFoundScreen`) 노출 및 홈 화면 복귀 기능 제공 |
 | **40** | 스마트 엑셀/CSV/텍스트 복사-붙여넣기 대용량 휴가 일괄 등록 시스템 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx), [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts) | 엑셀 `Ctrl+C` ➔ `Ctrl+V` 붙여넣기 및 CSV/Excel 파싱 모달(`BulkImportModal`) 탑재. 사원명 자동 매칭, 연차/선지급/무급/반차 스마트 자동 분류, 실시간 미리보기 및 1클릭 일괄 승인 등록 지원 |
 | **41** | 대시보드 휴가 캘린더 요일 시작 기준 변경 (월~일 ➔ 일~토) | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L565-L577), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L816) | 대시보드 휴가 캘린더 요일 헤더 및 날짜 그리드를 기존 월화수목금토일 형태에서 일월화수목금토(일요일 시작) 형태 및 6주차 동적 셀 확장 반영 |
+| **42** | 직원 본인 개인 정보 수정 및 비밀번호 확인/변경 시스템 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx), [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts) | 상단 헤더에 [내 정보 / 비밀번호 변경] 버튼 추가 및 `EditProfileModal` 구축. 직원 본인의 성명, 연락처, 부서, 이메일 수정 및 👁️ 비밀번호 시각 확인 토글 + 현재 비밀번호 검증 + 신규 비밀번호 변경 유효성 적용 |
+| **43** | 회사 일반휴가/반차 휴가 종류 및 사용 단위(unit 0.5일) 정확 반영 보정 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1366-L1500) | 회사 일반휴가 등 단일 일자(startDate===endDate) 휴가 신청 시 `isGeneral` 여부와 무관하게 선택된 `unit` (0.5일 반차) 정밀 반영. '반차' 라벨 자동 0.5일 고정 및 사용 단위 UI 노출 보정 |
+| **44** | 다중 관리자 간 결재/반려 실시간 백엔드 교차 동기화 구축 | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L185-L215), [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L290-L325) | 타 관리자가 승인/반려한 건이 다른 관리자 화면에서 '대기중'으로 지속되는 현상 해결. ① `getLeaves(true)` 우회 호출 시 로컬 구 오버라이드 자동 정제, ② 탭 이동 시 실시간 백엔드 DB 패치, ③ 30초 백그라운드 자동 동기화 적용 |
+| **45** | 대시보드 휴가 캘린더 전원 표출 시스템 구축 ('외 N명' 축약 제거) | **완료** | [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx#L1261-L1310) | 기존 최대 3명 노출 후 '외 N명'으로 축약되던 제한을 해제하고 당일 전체 휴가 사원 배지를 100% 전원 표시하도록 개편. 셀 스크롤(maxHeight: 180px) 및 반응형 레이아웃 적용 |
+| **46** | 대시보드 휴가 캘린더 및 최근 승인 이력 전 계정 회사 전체 공유 | **완료** | [api.ts](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/api.ts#L300-L305), [App.tsx](file:///f:/Antigravity/LeaveManagementSystem/frontend/src/App.tsx) | 일반 직원 로그인 시에도 대시보드 캘린더 및 최근 승인 이력 위젯에서 회사 전체 임직원의 승인된 휴가 일정을 공유하도록 수정 (상단 연차 소진 현황 및 신청 내역의 본인 한정 보안은 유지) |
 
 ---
 
@@ -223,6 +228,17 @@ graph TD
   2. **`monthCells` 계산 로직 보정**:
      - 달의 첫 날(`new Date(y, m, 1)`)의 `getDay()` (일요일: 0 ~ 토요일: 6)를 직접 `startOffset`으로 지정하여 첫 주 일요일부터 시작하도록 산출.
      - 31일 달이 금/토요일에 시작하는 경우 5주(35셀) 초과 시 날짜 누락을 방지하도록 `(startOffset + daysInMonth > 35) ? 42 : 35`로 총 셀 개수를 동적 확장.
+
+### 4.12. 대시보드 휴가 캘린더 및 최근 승인 이력 전 계정 회사 전체 공유 (Company-wide Calendar Sharing)
+* **배경 및 요구사항**:
+  기존 일반 직원 계정 로그인 시 대시보드 캘린더에 본인의 휴가 일정만 노출되어 다른 동료들의 연차/반차 일정을 파악하기 어려웠던 점을 개선하여, 팀 간 업무 협력 및 대체 근무 조율이 원활하도록 모든 직급(관리자/일반직원)이 대시보드 캘린더 및 최근 승인 이력을 전체 공유하도록 설정 수정하였습니다.
+* **구현 세부 사항**:
+  1. **`leaveAPI.getLeaves` 전달 파라미터 최적화**:
+     - 백엔드(GAS) 호출 시 `role: 'admin'` 파라미터를 요청하여 직급 구분 없이 소속 회사 임직원의 승인된 전체 휴가 목록을 수신하도록 보정.
+  2. **대시보드 캘린더 및 승인 이력 전원 공유**:
+     - `Dashboard` 컴포넌트의 `allLeaves` 및 `leavesByDay`를 통해 전 직원의 승인된 연차/반차/휴가 건이 대시보드 캘린더와 '최근 승인된 휴가 신청 이력' 위젯에 실시간 표시.
+  3. **개인 연차 및 신청 관리 보안 유지**:
+     - 대시보드 상단 '연차 소진현황' 카드는 일반 직원의 경우 본인 카드(`visibleEmps`)만 1개 노출되도록 유지하며, '휴가 신청 내역' 탭에서도 본인 신청 내역(`myLeaves`)만 조회/취소 가능하도록 개인 보안을 안전하게 구분.
 
 ---
 
