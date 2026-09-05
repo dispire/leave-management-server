@@ -1,17 +1,16 @@
 @echo off
-chcp 65001 > nul
-title 폴더 간 작가명 중복 검색기 실행
+title AuthorDuplicateFinder
 echo ========================================================
-echo   [AuthorDuplicateFinder] 폴더 간 작가명 중복 검색 프로그램
+echo   [AuthorDuplicateFinder] ���� �� �۰��� �ߺ� �˻� ���α׷�
 echo ========================================================
 echo.
-echo 프로그램 GUI 화면을 시작하는 중입니다...
+echo ���α׷� GUI ȭ���� �����ϴ� ���Դϴ�...
 
 python "%~dp0app_gui.py"
 
 if errorlevel 1 (
     echo.
-    echo [오류] 파이썬 프로그램 실행에 실패했습니다.
-    echo python 환경이 설치되어 있는지 확인해주세요.
+    echo [����] ���̽� ���α׷� ���࿡ �����߽��ϴ�.
+    echo python ȯ���� ��ġ�Ǿ� �ִ��� Ȯ�����ּ���.
     pause
 )
