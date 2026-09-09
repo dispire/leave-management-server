@@ -241,6 +241,17 @@ graph TD
   3. **개인 연차 및 신청 관리 보안 유지**:
      - 대시보드 상단 '연차 소진현황' 카드는 일반 직원의 경우 본인 카드(`visibleEmps`)만 1개 노출되도록 유지하며, '휴가 신청 내역' 탭에서도 본인 신청 내역(`myLeaves`)만 조회/취소 가능하도록 개인 보안을 안전하게 구분.
 
+### 4.13. 관리자 휴가 수정 DB 백엔드 영구 동기화 및 잔여연차 계산 복원 (Admin Edit Backend DB Sync Fix)
+* **배경 및 요구사항**:
+  관리자 계정에서 휴가 내역의 종류(예: 연차 ➔ 경조휴가)나 일수, 기간을 수정할 때 기존에 `localStorage` override에만 기록되고 Google Apps Script 백엔드 DB(구글 시트)로 전달되지 않아, 해당 직원(김진주) 계정으로 접속 시 잔여 연차가 오계산(-4.5일)되고 신규 반차 신청이 차단되는 이슈를 해결하였습니다.
+* **구현 세부 사항**:
+  1. `updateLeaveDetails` 및 `batchUpdateLeaveType` 백엔드 동기화:
+     - `api.ts`에서 휴가 내역 수정 시 `localStorage` override뿐만 아니라 GAS 백엔드로 `updateLeaveDetails` 요청을 보내어 `type`, `unit`, `start_date`, `end_date`, `reason`을 DB에 영구 반영.
+     - 수정 완료 시 관련 캐시(`cache_lms_getLeaves_*`) 무효화 처리.
+  2. 김진주 사원 데이터 정정:
+     - 3/1~3/7 건을 경조휴가(`family`)로 동기화하여 잔여 연차 마이너스(-4.5일) 상태를 정산 복원.
+     - 7/27(0.5일) 누락 반차 건 정상 추가 등록 연동.
+
 ---
 
 ## 5. 데이터 스키마 참고 (Data Schema Reference)
@@ -280,3 +291,4 @@ interface Leave {
   emp_dept?: string;
 }
 ```
+

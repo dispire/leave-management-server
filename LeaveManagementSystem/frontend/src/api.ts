@@ -380,7 +380,23 @@ export const leaveAPI = {
     const user = getSessionUser();
     if (!user) throw new Error('Unauthorized');
     setLeaveOverride(leaveId, data);
-    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    cache.invalidateAll();
+    try {
+      await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveDetails', {
+        leaveId,
+        companyId: user.company_id,
+        data: {
+          type: data.type,
+          unit: data.unit,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          reason: data.reason,
+          status: data.status
+        }
+      });
+    } catch (err) {
+      console.warn('updateLeaveDetails GAS sync notice:', err);
+    }
     if (data.status) {
       try {
         await makeGASRequest<{ success: boolean; message?: string }>('updateLeaveStatus', {
@@ -389,7 +405,7 @@ export const leaveAPI = {
           status: data.status
         });
       } catch (err) {
-        console.warn('updateLeaveDetails GAS sync notice:', err);
+        console.warn('updateLeaveDetails status sync notice:', err);
       }
     }
     return { success: true, message: '수정 성공' };
@@ -400,7 +416,20 @@ export const leaveAPI = {
     for (const id of leaveIds) {
       setLeaveOverride(id, { type: newType });
     }
-    cache.invalidate(cacheKey('getLeaves', user.company_id));
+    cache.invalidateAll();
+    try {
+      await Promise.allSettled(
+        leaveIds.map(id =>
+          makeGASRequest('updateLeaveDetails', {
+            leaveId: id,
+            companyId: user.company_id,
+            data: { type: newType }
+          }).catch(err => console.warn('batchUpdateLeaveType GAS sync error:', err))
+        )
+      );
+    } catch (err) {
+      console.warn('batchUpdateLeaveType sync error:', err);
+    }
     return { success: true, message: '일괄 변경 성공' };
   },
   deleteLeave: async (leaveId: string) => {
