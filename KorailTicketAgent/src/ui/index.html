@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>코레일 기차표 자동 예매 & 텔레그램 알림 시스템</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="icon">🚆</span>
+        <div>
+          <h1>코레일 기차표 자동 예매 시스템</h1>
+          <p class="subtitle">LetsKorail Playwright Automation & Telegram Alert Agent</p>
+        </div>
+      </div>
+      <div class="status-badge" id="statusBadge">
+        <span class="dot"></span>
+        <span id="statusText">준비 됨</span>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="app-content">
+      <!-- Left Column: Inputs -->
+      <section class="panel-left">
+        <!-- 1. Korail & Telegram Auth Card -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <h2>🔑 로그인 및 보안 설정</h2>
+            <span class="badge">계정 정보</span>
+          </div>
+          <div class="form-grid">
+            <div class="input-group">
+              <label for="korailId">코레일 멤버십 번호 (또는 이메일)</label>
+              <input type="text" id="korailId" placeholder="예: 1234567890" />
+            </div>
+            <div class="input-group">
+              <label for="korailPw">코레일 비밀번호</label>
+              <input type="password" id="korailPw" placeholder="••••••••" />
+            </div>
+            <div class="input-group">
+              <label for="telegramToken">텔레그램 봇 토큰 (Bot Token)</label>
+              <input type="text" id="telegramToken" placeholder="8858391422:AAH8..." />
+            </div>
+            <div class="input-group">
+              <label for="telegramChatId">텔레그램 Chat ID</label>
+              <input type="text" id="telegramChatId" placeholder="예: 7684110017" />
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-secondary" id="btnSaveEnv">💾 설정 저장 (.env)</button>
+          </div>
+        </div>
+
+        <!-- 2. Train Search & Reservation Card -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <h2>🔍 기차표 여정 및 예매 조건</h2>
+            <span class="badge badge-accent">검색 조건</span>
+          </div>
+          <div class="form-grid">
+            <div class="input-group">
+              <label for="departure">출발역</label>
+              <input type="text" id="departure" value="서울" placeholder="예: 서울, 수서, 용산" />
+            </div>
+            <div class="input-group">
+              <label for="arrival">도착역</label>
+              <input type="text" id="arrival" value="부산" placeholder="예: 부산, 동대구, 대전" />
+            </div>
+            <div class="input-group">
+              <label for="departDate">출발 날짜</label>
+              <input type="date" id="departDate" />
+            </div>
+            <div class="input-group">
+              <label for="departTime">출발 시간 (시)</label>
+              <select id="departTime">
+                <option value="00">00시 이후</option>
+                <option value="06">06시 이후</option>
+                <option value="08" selected>08시 이후</option>
+                <option value="10">10시 이후</option>
+                <option value="12">12시 이후</option>
+                <option value="14">14시 이후</option>
+                <option value="16">16시 이후</option>
+                <option value="18">18시 이후</option>
+                <option value="20">20시 이후</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="action-bar">
+            <button class="btn btn-primary" id="btnSearch">
+              <span>🔍 승차권 조회 & 텔레그램 전송</span>
+            </button>
+            <button class="btn btn-accent" id="btnReserve">
+              <span>⚡ 자동 예매 시도</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Real-time Console Log -->
+      <section class="panel-right">
+        <div class="card glass-card log-card">
+          <div class="card-header">
+            <h2>💻 실시간 진행 콘솔 로그</h2>
+            <button class="btn-text" id="btnClearLog">로그 지우기</button>
+          </div>
+          <div class="console-body" id="consoleBody">
+            <div class="log-entry info">[시스템 준비 완료] 코레일 기차표 자동 예매 시스템이 실행되었습니다.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>© 2026 KorailTicketAgent | Powered by Playwright & Electron</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
