@@ -20,10 +20,13 @@
     "files": [
       "dist/**/*",
       "src/ui/**/*",
+      "node_modules/**/*",
+      "package.json",
       ".env"
     ]
   },
   "dependencies": {
+    "call-bind-apply-helpers": "^1.0.2",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^4.22.2",
