@@ -44,7 +44,7 @@ const BASE_LEAVE_TYPES = [
   { id: 'unearned_annual', label: '연차 선사용(사전승인필요)', color: '#EF4444', bg: '#FEF2F2', exempt: false, fixed: true },
 ];
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() { return formatLocalDate(new Date()); }
 
 function fmtUnit(u: number) {
   if (u === 1) return '(1일)';
@@ -1078,11 +1078,17 @@ function Dashboard({ currentUser, employees, leaves, company, leaveTypes, isAdmi
         </div>
       )}
 
-      {/* Info Message on calculation standard */}
-      <div className="glass-card" style={{ background: '#fff', borderLeft: '4px solid var(--primary)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <Info size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-        <div style={{ fontSize: 13, color: 'var(--gray-700)' }}>
-          현재 회사의 연차 부여 기준은 <strong>{getBasisLabel(company?.basis_type, company?.basis_date)}</strong>입니다. 이에 따라 연차가 산출됩니다.
+      {/* Info Message on calculation standard & Today Date */}
+      <div className="glass-card" style={{ background: '#fff', borderLeft: '4px solid var(--primary)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Info size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+          <div style={{ fontSize: 13, color: 'var(--gray-700)' }}>
+            현재 회사의 연차 부여 기준은 <strong>{getBasisLabel(company?.basis_type, company?.basis_date)}</strong>입니다. 이에 따라 연차가 산출됩니다.
+          </div>
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '5px 12px', borderRadius: 20, border: '1px solid var(--primary-border)' }}>
+          <Clock size={14} />
+          <span>오늘: {today.getFullYear()}년 {today.getMonth() + 1}월 {today.getDate()}일 ({['일','월','화','수','목','금','토'][today.getDay()]})</span>
         </div>
       </div>
 
