@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { authAPI, companyAPI, employeeAPI, leaveAPI } from './api';
 import type { Employee, Company, Leave } from './api';
-import { getCurrentLeaveBalance, daysInRange, parseLocalDate, formatLocalDate } from './utils/leaveCalc';
+import { getCurrentLeaveBalance, daysInRange, parseLocalDate, formatLocalDate, findOverlappingLeave } from './utils/leaveCalc';
 import { formatPhone, formatBizRegNo } from './utils/format';
 
 const BASE_LEAVE_TYPES = [
@@ -1391,6 +1391,20 @@ function ApplyLeave({ currentUser, leaves, company, leaveTypes, onApply }: {
     }
     if (isNaN(u) || u <= 0) return alert('사용 일수가 올바르지 않습니다.');
 
+    // Check for duplicate / overlapping leave applications for the same date range
+    const overlap = findOverlappingLeave(leaves, currentUser.id, startDate, endDate, type);
+    if (overlap) {
+      const existingLabel = leaveTypes.find(t => t.id === overlap.type)?.label || overlap.type;
+      const statusLabel = overlap.status === 'approved' ? '승인완료' : '결재대기';
+      return alert(
+        `⚠️ 동일하거나 중복된 일자에 이미 신청된 휴가가 존재합니다.\n\n` +
+        `• 기존 신청 종류: ${existingLabel}\n` +
+        `• 기존 신청 기간: ${overlap.start_date} ~ ${overlap.end_date}\n` +
+        `• 기존 결재 상태: ${statusLabel}\n\n` +
+        `동일 일자 중복 신청은 허용되지 않습니다. 기존 신청 건을 확인하시거나 이력에서 삭제/변경 후 다시 신청해 주세요.`
+      );
+    }
+
     let isExceeded = false;
     if ((type === 'annual' || type === 'unearned_annual') && u > remaining) {
       const confirmProceed = confirm(
@@ -2712,6 +2726,11 @@ function HistoryModal({ emp, leaves, company, leaveTypes, allLeaveTypes, onClose
               <button 
                 className="btn btn-primary"
                 onClick={async () => {
+                  const overlap = findOverlappingLeave(leaves, emp.id, todayStr(), todayStr(), 'unearned_annual');
+                  if (overlap) {
+                    const statusLabel = overlap.status === 'approved' ? '승인완료' : '결재대기';
+                    return alert(`⚠️ ${emp.name} 사원은 오늘(${todayStr()}) 일자에 이미 휴가가 신청되어 있습니다. (기존 결재 상태: ${statusLabel})\n중복 등록할 수 없습니다.`);
+                  }
                   if (confirm(`${emp.name}님에게 1일 연차 선사용(사전승인)을 등록하여 소멸 예정 연차 1일을 보존/사용할 수 있도록 등록하시겠습니까?`)) {
                     try {
                       await leaveAPI.applyLeave({

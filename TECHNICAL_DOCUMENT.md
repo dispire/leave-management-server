@@ -230,3 +230,32 @@
    - `npm run build`로 프론트엔드 컴파일 및 타입 검증.
    - `npm run deploy`로 GitHub Pages(`gh-pages`) 배포.
    - `git add`, `git commit`, `git push origin master` 수행.
+
+---
+
+## 🛡️ 동일 날짜 중복 연차 신청 방지 및 삭제 이력 DB 정산 검증 (`LeaveManagementSystem`) (2026-09-15)
+
+### 📌 현상 및 사용자 문의 검토
+- **상황**: 직원(예: 서주희 사원)이 동일한 일자에 연차를 2회 중복 신청하여, 관리자가 [직원 관리 - 이력]에서 1건을 삭제 처리함.
+- **검토 요청 사항**:
+  1. 중복 신청 및 삭제 건이 DB(Google Sheets / Session)에 어떻게 저장되는가?
+  2. 삭제 처리된 중복 건이 향후 연차 잔여일수 계산에 문제를 유발하지 않는가?
+  3. 동일 날짜 중복 연차 신청이 사전에 차단되도록 방지 로직 구축 및 검증.
+
+### 🔍 DB 구조 및 연차 정산 영향 검증 결과 (검증 완료)
+1. **DB 및 캐시 저장 방식**:
+   - **신청 시**: 각 신청 건에 대해 고유 `leaveId`가 생성되어 Google Sheets `Leaves` 탭에 개별 Row로 추가됩니다.
+   - **삭제 시**: `deleteLeave(leaveId)` 호출 시 백엔드 DB 상에서는 상태가 `'rejected'`(반려)로 업데이트(또는 제거)되며, 프론트엔드 세션 오버라이드에 `deleted: true`가 설정되어 조회 목록에서 완전히 제외됩니다.
+2. **연차 잔여 계산(`getCurrentLeaveBalance`) 영향 검증**:
+   - 연차 계산 엔진(`leaveCalc.ts`)은 오직 **`status === 'approved'` (승인 완료)** 상태인 휴가만 연차 사용 일수(`used`)로 합산합니다.
+   - 삭제/반려된 건(`rejected` 또는 `deleted: true`)은 `used` 합산에서 완전히 배제(소진일수 0일)되므로, 향후 연차 산출에 아무런 문제를 일으키지 않음을 기술적으로 검증하였습니다.
+
+### 🛠️ 동일 날짜 중복 신청 방지 차단 기능 구현 계획
+1. **중복 검사 헬퍼 함수 개발 (`findOverlappingLeave` in `leaveCalc.ts`)**:
+   - 신청 대상 직원의 기존 활성(승인대기 `pending` 또는 승인완료 `approved`) 휴가 목록과 신규 신청 날짜 범위(`startDate` ~ `endDate`)의 중복 여부를 판별하는 엔진 구현.
+   - **예외 허용**: 동일 단일 일자에 대한 `am_half`(오전반차)와 `pm_half`(오후반차) 조합은 정상적인 1일 분할 사용이므로 공존 허용.
+   - **차단**: 동일 날짜 전일 연차(`annual`) 중복, 동일 반차(`am_half` + `am_half`) 중복, 또는 기존 연차 기간 내 중복 신청 시 즉시 경고 창과 함께 신청 차단.
+2. **신청 폼 및 관리자 대리 등록 화면 연동 (`App.tsx`)**:
+   - 직원 직접 신청 모달(`LeaveApplicationModal`) 및 관리자 대리 등록 모달(`EmployeeMgmt`)에 중복 체크 적용.
+3. **빌드, 테스트 및 GitHub Pages 재배포**:
+   - `npm run build` 및 `npm run deploy` 실행 후 `git push origin master`.

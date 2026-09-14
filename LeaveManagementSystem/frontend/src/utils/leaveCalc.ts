@@ -363,3 +363,43 @@ export function getCurrentLeaveBalance(
     allCycles: cycles
   };
 }
+
+/**
+ * Checks if a requested leave date range overlaps with an employee's existing non-rejected leaves.
+ * Returns the overlapping leave if found, otherwise null.
+ * Allows co-existence of morning half-day (am_half) and afternoon half-day (pm_half) on the exact same single date.
+ */
+export function findOverlappingLeave(
+  leaves: LeaveRequest[],
+  empId: string,
+  startDate: string,
+  endDate: string,
+  newType: string
+): LeaveRequest | null {
+  if (!startDate || !endDate || !empId || !Array.isArray(leaves)) return null;
+
+  const activeLeaves = leaves.filter(l => 
+    l.emp_id === empId && 
+    l.status !== 'rejected'
+  );
+
+  for (const existing of activeLeaves) {
+    const exStart = existing.start_date;
+    const exEnd = existing.end_date;
+
+    // Standard date range overlap check: exStart <= endDate && exEnd >= startDate
+    if (exStart <= endDate && exEnd >= startDate) {
+      // Exception: am_half & pm_half on the exact same single day are allowed to coexist
+      if (startDate === endDate && exStart === exEnd && startDate === exStart) {
+        if (
+          (existing.type === 'am_half' && newType === 'pm_half') ||
+          (existing.type === 'pm_half' && newType === 'am_half')
+        ) {
+          continue; // Allowed combination (0.5 + 0.5 = 1 day)
+        }
+      }
+      return existing; // Overlapping leave found
+    }
+  }
+  return null;
+}
