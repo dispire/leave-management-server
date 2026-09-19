@@ -26,7 +26,7 @@ function setLoading(loading) {
     document.getElementById('btnSearch').querySelector('span').textContent = '🔄 조회 중...';
     setStatus('조회 중...', 'running');
   } else {
-    document.getElementById('btnSearch').querySelector('span').textContent = '🔍 열차 조회 & 텔레그램 전송';
+    document.getElementById('btnSearch').querySelector('span').textContent = '🔍 열차 조회 (브라우저 표출)';
     setStatus('준비 됨', '');
   }
 }
@@ -115,19 +115,33 @@ window.hideErrorBanner = function() {
   }
 };
 
-function renderResultsTable(results) {
+function renderResultsTable(results, departure, arrival, dateStr, timeStr) {
   const card = document.getElementById('resultsCard');
   const tbody = document.getElementById('resultsTableBody');
   const countBadge = document.getElementById('resultCountBadge');
 
   if (!card || !tbody) return;
 
+  card.style.display = 'block';
+
   if (!results || results.length === 0) {
-    card.style.display = 'none';
+    countBadge.textContent = `0건`;
+    const formattedDate = dateStr && /^\d{8}$/.test(dateStr) 
+      ? dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') 
+      : '선택일';
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center; padding: 30px 15px; color: var(--text-muted); font-size: 0.9rem;">
+          <div style="font-size: 1.2rem; margin-bottom: 6px;">⚠️ <strong>조회된 열차가 없습니다.</strong></div>
+          <div style="font-size: 0.85rem; color: #a0aec0; line-height: 1.5;">
+            선택하신 일시(<strong>${formattedDate} ${timeStr || '00'}:00 이후</strong>) 및 구간(<strong>${departure || ''} ➔ ${arrival || ''}</strong>)에 운행하는 열차가 없거나 예매 가능 날짜 범위를 벗어났습니다.
+          </div>
+        </td>
+      </tr>
+    `;
     return;
   }
 
-  card.style.display = 'block';
   countBadge.textContent = `${results.length}건`;
   tbody.innerHTML = '';
 
@@ -213,17 +227,25 @@ async function doSearch(reserve = false) {
     if (data.success) {
       if (!reserve) {
         // Pure Search Mode: Display in browser table
-        log('✅ 조회 완료! 아래 [열차 조회 결과] 테이블에서 상세 내용을 확인하세요.', 'success');
-        renderResultsTable(data.results);
-        setStatus('조회 완료', '');
+        if (data.results && data.results.length > 0) {
+          log(`✅ 조회 완료! 총 ${data.results.length}건의 열차가 발견되었습니다. 아래 테이블에서 확인하세요.`, 'success');
+        } else {
+          log(`⚠️ 조회 완료: 선택하신 조건(${departure} ➔ ${arrival}, ${dateStr || ''} ${timeStr}:00 이후)에 운행하는 열차가 없습니다.`, 'warn');
+        }
+        renderResultsTable(data.results, departure, arrival, dateStr, timeStr);
+        setStatus(data.results && data.results.length > 0 ? '조회 완료' : '결과 없음', '');
       } else {
         // Reserve Mode
         if (data.reserved) {
           log('🎉 [예약 완료!] 열차가 성공적으로 예매되었습니다.', 'success');
           log('📲 텔레그램으로 완료 메시지가 발송되었습니다. 10분 내 결제하세요.', 'success');
           setStatus('예약 완료!', 'running');
+          if (data.reservedTrain) {
+            renderResultsTable([data.reservedTrain], departure, arrival, dateStr, timeStr);
+          }
         } else {
           log(`ℹ️ ${data.message || '현재 잔여 좌석이 없습니다.'}`, 'warn');
+          renderResultsTable([], departure, arrival, dateStr, timeStr);
           setStatus('좌석 없음', '');
         }
       }
