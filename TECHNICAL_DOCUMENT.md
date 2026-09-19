@@ -156,6 +156,18 @@
 4. **다크 모드 데스크톱 GUI (`CustomTkinter`)**:
    - 세련된 프리미엄 다크모드 인터페이스 제공.
 
+### 📊 PC 상태 진단 및 최적화 실행 기록 (2026-09-16)
+1. **현재 PC 리소스 정밀 진단**:
+   - **RAM 점유율**: 총 7.95 GB 중 7.62 GB 사용 중 (**95.9% 경고 수준**). 상위 사용 프로세스: `hitomi_downloader_GUI.exe` (558MB), `Antigravity IDE.exe` (374MB), `Chrome` 탭들.
+   - **C: 드라이브 저장공간**: 총 222.16 GB 중 215.51 GB 사용 중 (**97.0% 용량 부족 경고**, 잔여 6.65 GB).
+   - **hiberfil.sys**: 존재함 (3.18 GB 차지).
+   - **캐시 & 임시 파일**: SoftwareDistribution 업데이트 캐시 (655MB), Temp (341MB), Chrome/Edge 캐시 (453MB).
+2. **원클릭 RAM 최적화 즉시 실행**:
+   - `optimizer_core.optimize_memory()` (`EmptyWorkingSet` API) 실행 완료.
+   - **158개 프로세스에 대해 총 1,095.9 MB (~1.1 GB) RAM 공간 즉시 환수 성공** (RAM 사용량 7.56 GB → 6.49 GB로 감소).
+3. **진단 자동화 스크립트 작성**:
+   - `PCOptimizer/check_pc_status.py` 작성 및 원클릭 상태 검증 체계 구축.
+
 ---
 
 ## 🏢 네이버 부동산 데이터 수집 프로젝트 점검 및 성산동 아파트 매매 수집 (`NaverRealEstate`) (2026-09-03)
@@ -259,3 +271,24 @@
    - 직원 직접 신청 모달(`LeaveApplicationModal`) 및 관리자 대리 등록 모달(`EmployeeMgmt`)에 중복 체크 적용.
 3. **빌드, 테스트 및 GitHub Pages 재배포**:
    - `npm run build` 및 `npm run deploy` 실행 후 `git push origin master`.
+
+---
+
+## 🚆 코레일 기차표 자동 예매 시스템 점검 및 실행 (`KorailTicketAgent`) (2026-09-19)
+
+### 📌 프로젝트 현황 및 점검 결과
+- **프로젝트 위치**: `f:\Antigravity\KorailTicketAgent`
+- **구현 현황**:
+  1. **Playwright 자동화 엔진 (`src/korail_engine.ts`, `src/stealth_korail_search.ts`)**: 코레일 웹사이트(`letskorail.com`) 스텔스 브라우저 세션 기반 열차 실시간 조회 및 자동 예매 엔진 구축 완료.
+  2. **프론트엔드 GUI (`src/ui/index.html`, `styles.css`, `app.js`)**: 로그인 정보(회원번호/비밀번호), 텔레그램 연동(Bot Token/Chat ID), 출발/도착역, 날짜/시간, 인원 수 설정 및 실시간 로그 콘솔 화면 구현 완료.
+  3. **백엔드 Express API & Electron (`src/server.ts`, `src/main.ts`)**: 백엔드 REST API 서버 및 실행 파일 포팅 구조 검증 완료.
+  4. **실행 환경**: 사용자의 직접 로그인 및 예매 조작을 위한 GUI 실행 환경 (`KorailTicketAgent_Launcher.bat`, `http://localhost:3840`) 준비 완료.
+  5. **브라우저 에러 알림 배너 & 구형 셀렉터 수정**:
+     - 구형 `korail_agent.ts` 내 `#txtGoStart` 타임아웃 오류를 `searchKorailTickets` 엔진 통합으로 해소.
+     - 웹 브라우저 화면(`http://localhost:3840`) 상단에 빨간색 **[🚨 예매/조회 중 오류 발생 알림 배너 (Browser Alert)]** 및 실시간 콘솔 오류 표출 기능 반영.
+  6. **조회 결과 브라우저 전용 표출 & 예약 성공시 텔레그램 발송 분리**:
+     - 단순 조회 결과는 텔레그램으로 메시지를 남발하지 않고, 웹 UI 상의 **[📋 열차 조회 결과 (브라우저 확인)]** 카드 테이블에 직접 표출.
+     - 자동 예매 시도 후 예약이 최종 성공한 경우에만 `🎉 [코레일 열차 예매 성공 알림]` 텔레그램 메시지가 전송되도록 로직 개편 완료.
+  7. **모달 선택 정확도 강화 및 헤더 더미 데이터 오생성 원천 차단 (2026-09-19)**:
+     - **이슈 분석**: 24일 12시 등 열차가 없을 때("해당 스케줄에 운행하는 열차가 없습니다"), 정규식 파서가 상단 헤더 텍스트(`2026-09-19(토) 11:00`)를 오인하여 `열차 | 11:00 | - | - | 예매가능` 가짜 행을 만들어 내던 결함 원천 수정.
+     - **해결**: `parseResults`에서 코레일 `해당 스케줄에 운행하는 열차가 없습니다` 감지 시 즉시 빈 배열 `[]` 반환 및 모달 선택 시 `button.btn_bn-blue` (적용) 닫기 정확도 보장 완료.

@@ -13,15 +13,12 @@
   "build": {
     "appId": "com.korail.ticketagent",
     "productName": "KorailTicketAgent",
-    "asar": false,
     "win": {
       "target": "dir"
     },
     "files": [
       "dist/**/*",
       "src/ui/**/*",
-      "node_modules/**/*",
-      "package.json",
       ".env"
     ]
   },
@@ -31,7 +28,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.22.2",
     "node-telegram-bot-api": "^0.66.0",
-    "playwright": "^1.50.0"
+    "playwright": "^1.63.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

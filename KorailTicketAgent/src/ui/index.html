@@ -15,7 +15,7 @@
         <span class="icon">🚆</span>
         <div>
           <h1>코레일 기차표 자동 예매 시스템</h1>
-          <p class="subtitle">LetsKorail Playwright Automation & Telegram Alert Agent</p>
+          <p class="subtitle">korail.com 실시간 조회 & 텔레그램 알림 에이전트</p>
         </div>
       </div>
       <div class="status-badge" id="statusBadge">
@@ -24,32 +24,44 @@
       </div>
     </header>
 
+    <!-- Error Alert Banner -->
+    <div class="error-banner-container" id="errorBannerContainer" style="display: none;">
+      <div class="error-banner">
+        <div class="error-banner-header">
+          <span class="error-icon">🚨</span>
+          <strong>예매/조회 중 오류 발생 (Browser Alert)</strong>
+          <button class="btn-close-banner" onclick="window.hideErrorBanner()">✕</button>
+        </div>
+        <div class="error-banner-body" id="errorBannerMessage"></div>
+      </div>
+    </div>
+
     <!-- Main Content Layout -->
     <main class="app-content">
       <!-- Left Column: Inputs -->
       <section class="panel-left">
-        <!-- 1. Korail & Telegram Auth Card -->
+        <!-- 1. Auth Card -->
         <div class="card glass-card">
           <div class="card-header">
-            <h2>🔑 로그인 및 보안 설정</h2>
+            <h2>🔑 로그인 및 알림 설정</h2>
             <span class="badge">계정 정보</span>
           </div>
           <div class="form-grid">
             <div class="input-group">
               <label for="korailId">코레일 멤버십 번호 (또는 이메일)</label>
-              <input type="text" id="korailId" placeholder="예: 1234567890" />
+              <input type="text" id="korailId" placeholder="예: 1234567890" autocomplete="off" />
             </div>
             <div class="input-group">
               <label for="korailPw">코레일 비밀번호</label>
-              <input type="password" id="korailPw" placeholder="••••••••" />
+              <input type="password" id="korailPw" placeholder="••••••••" autocomplete="off" />
             </div>
             <div class="input-group">
-              <label for="telegramToken">텔레그램 봇 토큰 (Bot Token)</label>
-              <input type="text" id="telegramToken" placeholder="8858391422:AAH8..." />
+              <label for="telegramToken">텔레그램 봇 토큰</label>
+              <input type="text" id="telegramToken" placeholder="8858391422:AAH8..." autocomplete="off" />
             </div>
             <div class="input-group">
               <label for="telegramChatId">텔레그램 Chat ID</label>
-              <input type="text" id="telegramChatId" placeholder="예: 7684110017" />
+              <input type="text" id="telegramChatId" placeholder="예: 7684110017" autocomplete="off" />
             </div>
           </div>
           <div class="card-footer">
@@ -57,61 +69,137 @@
           </div>
         </div>
 
-        <!-- 2. Train Search & Reservation Card -->
+        <!-- 2. Train Search Card -->
         <div class="card glass-card">
           <div class="card-header">
-            <h2>🔍 기차표 여정 및 예매 조건</h2>
+            <h2>🔍 승차권 예매 조건</h2>
             <span class="badge badge-accent">검색 조건</span>
           </div>
-          <div class="form-grid">
-            <div class="input-group">
-              <label for="departure">출발역</label>
-              <input type="text" id="departure" value="서울" placeholder="예: 서울, 수서, 용산" />
+
+          <!-- 출발/도착역 -->
+          <div class="station-row">
+            <div class="input-group station-group">
+              <label for="departure">✈️ 출발역</label>
+              <input type="text" id="departure" value="서울" placeholder="예: 서울, 수서, 용산, 청량리" />
             </div>
-            <div class="input-group">
-              <label for="arrival">도착역</label>
-              <input type="text" id="arrival" value="부산" placeholder="예: 부산, 동대구, 대전" />
-            </div>
-            <div class="input-group">
-              <label for="departDate">출발 날짜</label>
-              <input type="date" id="departDate" />
-            </div>
-            <div class="input-group">
-              <label for="departTime">출발 시간 (시)</label>
-              <select id="departTime">
-                <option value="00">00시 이후</option>
-                <option value="06">06시 이후</option>
-                <option value="08" selected>08시 이후</option>
-                <option value="10">10시 이후</option>
-                <option value="12">12시 이후</option>
-                <option value="14">14시 이후</option>
-                <option value="16">16시 이후</option>
-                <option value="18">18시 이후</option>
-                <option value="20">20시 이후</option>
-              </select>
+            <button class="btn-swap" id="btnSwapStation" title="출발/도착 바꾸기">⇄</button>
+            <div class="input-group station-group">
+              <label for="arrival">📍 도착역</label>
+              <input type="text" id="arrival" value="부산" placeholder="예: 부산, 동대구, 대전, 양평" />
             </div>
           </div>
 
+          <!-- 일정 및 인원 -->
+          <div class="form-grid-3col">
+            <div class="input-group">
+              <label for="departDate">📅 출발 날짜</label>
+              <input type="date" id="departDate" />
+            </div>
+            <div class="input-group">
+              <label for="departTime">⏰ 출발 시간</label>
+              <select id="departTime">
+                <option value="00">00시 이후</option>
+                <option value="01">01시 이후</option>
+                <option value="02">02시 이후</option>
+                <option value="03">03시 이후</option>
+                <option value="04">04시 이후</option>
+                <option value="05">05시 이후</option>
+                <option value="06">06시 이후</option>
+                <option value="07">07시 이후</option>
+                <option value="08" selected>08시 이후</option>
+                <option value="09">09시 이후</option>
+                <option value="10">10시 이후</option>
+                <option value="11">11시 이후</option>
+                <option value="12">12시 이후</option>
+                <option value="13">13시 이후</option>
+                <option value="14">14시 이후</option>
+                <option value="15">15시 이후</option>
+                <option value="16">16시 이후</option>
+                <option value="17">17시 이후</option>
+                <option value="18">18시 이후</option>
+                <option value="19">19시 이후</option>
+                <option value="20">20시 이후</option>
+                <option value="21">21시 이후</option>
+                <option value="22">22시 이후</option>
+                <option value="23">23시 이후</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="passengers">👤 인원 수</label>
+              <div class="number-input-wrap">
+                <button class="btn-number" id="btnMinus" onclick="adjustPassenger(-1)">−</button>
+                <input type="number" id="passengers" value="1" min="1" max="9" readonly />
+                <button class="btn-number" id="btnPlus" onclick="adjustPassenger(1)">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 옵션 (인접역 / 서울·용산·수서) -->
+          <div class="options-section">
+            <div class="options-title">⚙️ 옵션</div>
+            <div class="options-grid">
+              <label class="toggle-label">
+                <input type="checkbox" id="includeAdjacent" />
+                <span class="toggle-track"></span>
+                <span class="toggle-text">인접역 보기 <small>(포함)</small></span>
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="includeSeoulGroup" />
+                <span class="toggle-track"></span>
+                <span class="toggle-text">서울·용산·수서 함께 보기 <small>(포함)</small></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 실행 버튼 -->
           <div class="action-bar">
             <button class="btn btn-primary" id="btnSearch">
-              <span>🔍 승차권 조회 & 텔레그램 전송</span>
+              <span>🔍 열차 조회 (브라우저 표출)</span>
             </button>
             <button class="btn btn-accent" id="btnReserve">
-              <span>⚡ 자동 예매 시도</span>
+              <span>⚡ 자동 예매 시도 (예약 시 텔레그램 발송)</span>
             </button>
           </div>
         </div>
       </section>
 
-      <!-- Right Column: Real-time Console Log -->
+      <!-- Right Column: Results & Real-time Console Log -->
       <section class="panel-right">
+        <!-- Train Results Card -->
+        <div class="card glass-card" id="resultsCard" style="display: none; margin-bottom: 20px;">
+          <div class="card-header">
+            <h2>📋 열차 조회 결과 (브라우저 확인)</h2>
+            <span class="badge badge-accent" id="resultCountBadge">0건</span>
+          </div>
+          <div class="results-table-wrap">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>열차명 / 번호</th>
+                  <th>출발시간</th>
+                  <th>도착시간</th>
+                  <th>소요시간</th>
+                  <th>좌석 상태</th>
+                  <th>작동</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTableBody">
+                <!-- Dynamic rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Log Console Card -->
         <div class="card glass-card log-card">
           <div class="card-header">
-            <h2>💻 실시간 진행 콘솔 로그</h2>
+            <h2>💻 실시간 진행 콘솔 (Live Monitor)</h2>
             <button class="btn-text" id="btnClearLog">로그 지우기</button>
           </div>
           <div class="console-body" id="consoleBody">
             <div class="log-entry info">[시스템 준비 완료] 코레일 기차표 자동 예매 시스템이 실행되었습니다.</div>
+            <div class="log-entry info">[설정] 열차 조회의 모든 결과는 브라우저 화면에 표출됩니다.</div>
+            <div class="log-entry info">[알림] 자동 예매 성공 시 텔레그램으로 완료 메시지가 즉시 발송됩니다.</div>
           </div>
         </div>
       </section>
@@ -119,7 +207,7 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>© 2026 KorailTicketAgent | Powered by Playwright & Electron</p>
+      <p>© 2026 KorailTicketAgent | korail.com Playwright Engine v2.0</p>
     </footer>
   </div>
 

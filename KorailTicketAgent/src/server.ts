@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import { searchAndReserveKorail } from './korail_agent.js';
+import { searchKorailTickets, reserveKorailTickets } from './korail_engine.js';
 
 dotenv.config();
 
@@ -34,7 +34,7 @@ app.get('/api/config', (req, res) => {
 // POST Save Config
 app.post('/api/config', (req, res) => {
   const { korailId, korailPw, telegramToken, telegramChatId } = req.body;
-  const envContent = 
+  const envContent =
     `# Korail Credentials\n` +
     `KORAIL_MEMBERSHIP_NO=${korailId || ''}\n` +
     `KORAIL_PASSWORD=${korailPw || ''}\n\n` +
@@ -51,40 +51,59 @@ app.post('/api/config', (req, res) => {
   }
 });
 
-// POST Search Trains
+// POST Search Trains (v2 — korail_engine) - Returns results for Browser UI display
 app.post('/api/search', async (req, res) => {
-  const { departure, arrival, dateStr, timeStr, korailId, korailPw, telegramToken, telegramChatId } = req.body;
+  const {
+    departure, arrival, dateStr, timeStr,
+    passengers, includeAdjacent, includeSeoulGroup,
+    korailId, korailPw, telegramToken, telegramChatId,
+  } = req.body;
 
-  if (telegramToken) process.env.TELEGRAM_BOT_TOKEN = telegramToken;
-  if (telegramChatId) process.env.ALLOWED_CHAT_ID = telegramChatId;
-  if (korailId) process.env.KORAIL_MEMBERSHIP_NO = korailId;
-  if (korailPw) process.env.KORAIL_PASSWORD = korailPw;
+  if (telegramToken)   process.env.TELEGRAM_BOT_TOKEN   = telegramToken;
+  if (telegramChatId)  process.env.ALLOWED_CHAT_ID       = telegramChatId;
+  if (korailId)        process.env.KORAIL_MEMBERSHIP_NO  = korailId;
+  if (korailPw)        process.env.KORAIL_PASSWORD        = korailPw;
 
   try {
-    await searchAndReserveKorail({
-      departure: departure || '서울',
-      arrival: arrival || '부산',
+    const results = await searchKorailTickets({
+      departure:              departure || '서울',
+      arrival:                arrival   || '부산',
       dateStr,
       timeStr,
+      passengers:             passengers || 1,
+      includeAdjacentStation: includeAdjacent   || false,
+      includeSeoulGroup:      includeSeoulGroup  || false,
     });
-    res.json({ success: true });
+    res.json({ success: true, results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST Reserve Train
+// POST Reserve Train (v2 — korail_engine) - Sends Telegram alert ONLY upon successful reservation!
 app.post('/api/reserve', async (req, res) => {
-  const { departure, arrival, dateStr, timeStr } = req.body;
+  const {
+    departure, arrival, dateStr, timeStr,
+    passengers, includeAdjacent, includeSeoulGroup,
+    korailId, korailPw, telegramToken, telegramChatId,
+  } = req.body;
+
+  if (telegramToken)   process.env.TELEGRAM_BOT_TOKEN   = telegramToken;
+  if (telegramChatId)  process.env.ALLOWED_CHAT_ID       = telegramChatId;
+  if (korailId)        process.env.KORAIL_MEMBERSHIP_NO  = korailId;
+  if (korailPw)        process.env.KORAIL_PASSWORD        = korailPw;
 
   try {
-    await searchAndReserveKorail({
-      departure: departure || '서울',
-      arrival: arrival || '부산',
+    const reserveResult = await reserveKorailTickets({
+      departure:              departure || '서울',
+      arrival:                arrival   || '부산',
       dateStr,
       timeStr,
+      passengers:             passengers || 1,
+      includeAdjacentStation: includeAdjacent   || false,
+      includeSeoulGroup:      includeSeoulGroup  || false,
     });
-    res.json({ success: true });
+    res.json(reserveResult);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -92,6 +111,7 @@ app.post('/api/reserve', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`==================================================`);
-  console.log(`🖥️ KorailTicketAgent Server Running at: http://localhost:${PORT}`);
+  console.log(`🖥️ KorailTicketAgent Server v2.0 — http://localhost:${PORT}`);
+  console.log(`🚆 Engine: korail_engine.ts (korail.com React SPA)`);
   console.log(`==================================================`);
 });

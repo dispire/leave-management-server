@@ -1,162 +1,254 @@
-// Desktop App Frontend Script
-const statusBadge = document.getElementById('statusBadge');
-const statusText = document.getElementById('statusText');
-const consoleBody = document.getElementById('consoleBody');
+// KorailTicketAgent UI App Logic v2.0
+const API = 'http://localhost:3840';
 
-const korailId = document.getElementById('korailId');
-const korailPw = document.getElementById('korailPw');
-const telegramToken = document.getElementById('telegramToken');
-const telegramChatId = document.getElementById('telegramChatId');
-
-const departure = document.getElementById('departure');
-const arrival = document.getElementById('arrival');
-const departDate = document.getElementById('departDate');
-const departTime = document.getElementById('departTime');
-
-const btnSaveEnv = document.getElementById('btnSaveEnv');
-const btnSearch = document.getElementById('btnSearch');
-const btnReserve = document.getElementById('btnReserve');
-const btnClearLog = document.getElementById('btnClearLog');
-
-// Set default date to today
-const today = new Date().toISOString().split('T')[0];
-departDate.value = today;
-
-function log(message, type = 'info') {
-  const now = new Date().toLocaleTimeString('ko-KR');
-  const div = document.createElement('div');
-  div.className = `log-entry ${type}`;
-  div.textContent = `[${now}] ${message}`;
-  consoleBody.appendChild(div);
-  consoleBody.scrollTop = consoleBody.scrollHeight;
+// ─── Utils ───────────────────────────────────
+function log(msg, type = 'info') {
+  const body = document.getElementById('consoleBody');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  const ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+  entry.textContent = `[${ts}] ${msg}`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
 }
 
-function setStatus(text, isBusy = false) {
+function setStatus(text, cls = '') {
+  const badge = document.getElementById('statusBadge');
+  const statusText = document.getElementById('statusText');
+  badge.className = 'status-badge ' + cls;
   statusText.textContent = text;
-  if (isBusy) {
-    statusBadge.style.borderColor = '#3b82f6';
-    statusBadge.style.color = '#3b82f6';
+}
+
+function setLoading(loading) {
+  document.getElementById('btnSearch').disabled = loading;
+  document.getElementById('btnReserve').disabled = loading;
+  if (loading) {
+    document.getElementById('btnSearch').querySelector('span').textContent = '🔄 조회 중...';
+    setStatus('조회 중...', 'running');
   } else {
-    statusBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-    statusBadge.style.color = '#10b981';
+    document.getElementById('btnSearch').querySelector('span').textContent = '🔍 열차 조회 & 텔레그램 전송';
+    setStatus('준비 됨', '');
   }
 }
 
-// Clear log button
-btnClearLog.addEventListener('click', () => {
-  consoleBody.innerHTML = '';
-  log('로그가 초기화되었습니다.', 'info');
+// 인원 수 조절
+window.adjustPassenger = function(delta) {
+  const input = document.getElementById('passengers');
+  const current = parseInt(input.value) || 1;
+  const next = Math.max(1, Math.min(9, current + delta));
+  input.value = next;
+};
+
+// 출발/도착 바꾸기
+document.getElementById('btnSwapStation')?.addEventListener('click', () => {
+  const dep = document.getElementById('departure');
+  const arr = document.getElementById('arrival');
+  [dep.value, arr.value] = [arr.value, dep.value];
+  log('🔄 출발/도착역이 교체되었습니다.', 'info');
 });
 
-// Load Env Settings from Local API
+// ─── Load Config ─────────────────────────────
 async function loadConfig() {
   try {
-    const res = await fetch('/api/config');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.korailId) korailId.value = data.korailId;
-      if (data.korailPw) korailPw.value = data.korailPw;
-      if (data.telegramToken) telegramToken.value = data.telegramToken;
-      if (data.telegramChatId) telegramChatId.value = data.telegramChatId;
-      log('기존 환경 변수 설정(.env)을 성공적으로 로드했습니다.', 'success');
-    }
-  } catch {
-    log('로컬 API 서버 연결 중...', 'info');
+    const res = await fetch(`${API}/api/config`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.korailId)        document.getElementById('korailId').value = data.korailId;
+    if (data.korailPw)        document.getElementById('korailPw').value = data.korailPw;
+    if (data.telegramToken)   document.getElementById('telegramToken').value = data.telegramToken;
+    if (data.telegramChatId)  document.getElementById('telegramChatId').value = data.telegramChatId;
+    log('✅ 저장된 설정이 로드되었습니다.', 'success');
+  } catch (e) {
+    log('⚠️ 서버 연결 확인 중... (서버 미실행 시 무시)', 'warn');
   }
 }
 
-// Save Env Settings
-btnSaveEnv.addEventListener('click', async () => {
-  setStatus('설정 저장 중...', true);
-  log('환경 변수(.env) 저장 요청...', 'info');
+// 기본 날짜 = 오늘
+(function setDefaultDate() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('departDate').value = `${yyyy}-${mm}-${dd}`;
+})();
+
+// ─── Save Config ──────────────────────────────
+document.getElementById('btnSaveEnv')?.addEventListener('click', async () => {
+  const body = {
+    korailId: document.getElementById('korailId').value,
+    korailPw: document.getElementById('korailPw').value,
+    telegramToken: document.getElementById('telegramToken').value,
+    telegramChatId: document.getElementById('telegramChatId').value,
+  };
   try {
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        korailId: korailId.value.trim(),
-        korailPw: korailPw.value.trim(),
-        telegramToken: telegramToken.value.trim(),
-        telegramChatId: telegramChatId.value.trim(),
-      }),
+    const res = await fetch(`${API}/api/config`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const data = await res.json();
     if (data.success) {
-      log('✅ .env 환경 변수가 저장되었습니다!', 'success');
+      log('💾 설정이 .env 파일에 저장되었습니다.', 'success');
     } else {
-      log(`❌ 저장 실패: ${data.error}`, 'error');
+      log('❌ 설정 저장 실패: ' + (data.error || '알 수 없는 오류'), 'error');
     }
-  } catch (err) {
-    log(`❌ 서버 통신 오류: ${err.message}`, 'error');
-  } finally {
-    setStatus('준비 됨');
+  } catch (e) {
+    log('❌ 서버 연결 실패: ' + e.message, 'error');
   }
 });
 
-// Search Trains
-btnSearch.addEventListener('click', async () => {
-  setStatus('조회 중...', true);
-  log(`🚀 코레일 열차 조회 시작: ${departure.value} -> ${arrival.value} (${departDate.value} ${departTime.value}시)`, 'info');
+// ─── Search ───────────────────────────────────
+document.getElementById('btnSearch')?.addEventListener('click', () => doSearch(false));
+document.getElementById('btnReserve')?.addEventListener('click', () => doSearch(true));
+
+window.showErrorBanner = function(msg) {
+  const container = document.getElementById('errorBannerContainer');
+  const msgEl = document.getElementById('errorBannerMessage');
+  if (container && msgEl) {
+    msgEl.textContent = msg;
+    container.style.display = 'block';
+  }
+};
+
+window.hideErrorBanner = function() {
+  const container = document.getElementById('errorBannerContainer');
+  if (container) {
+    container.style.display = 'none';
+  }
+};
+
+function renderResultsTable(results) {
+  const card = document.getElementById('resultsCard');
+  const tbody = document.getElementById('resultsTableBody');
+  const countBadge = document.getElementById('resultCountBadge');
+
+  if (!card || !tbody) return;
+
+  if (!results || results.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = 'block';
+  countBadge.textContent = `${results.length}건`;
+  tbody.innerHTML = '';
+
+  results.forEach(r => {
+    const tr = document.createElement('tr');
+    const isAvail = r.available;
+    const seatHtml = isAvail
+      ? `<span class="badge-avail">${r.generalSeat || '예매가능'}</span>`
+      : `<span class="badge-soldout">매진</span>`;
+
+    const actionHtml = isAvail
+      ? `<button class="btn-table-reserve" onclick="reserveSingleTrain('${r.trainNo}', '${r.departTime}')">예매 시도</button>`
+      : `<span style="color:var(--text-muted); font-size:0.75rem;">대기</span>`;
+
+    tr.innerHTML = `
+      <td><strong>${r.trainNo || '열차'}</strong></td>
+      <td>${r.departTime || '-'}</td>
+      <td>${r.arrivalTime || '-'}</td>
+      <td>${r.duration || '-'}</td>
+      <td>${seatHtml}</td>
+      <td>${actionHtml}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+window.reserveSingleTrain = function(trainNo, departTime) {
+  log(`⚡ [선택 열차 예매 시도] ${trainNo} (${departTime})`, 'accent');
+  doSearch(true);
+};
+
+async function doSearch(reserve = false) {
+  window.hideErrorBanner();
+
+  const departure   = document.getElementById('departure').value.trim();
+  const arrival     = document.getElementById('arrival').value.trim();
+  const dateRaw     = document.getElementById('departDate').value;
+  const timeStr     = document.getElementById('departTime').value;
+  const passengers  = parseInt(document.getElementById('passengers').value) || 1;
+  const includeAdjacent   = document.getElementById('includeAdjacent').checked;
+  const includeSeoulGroup = document.getElementById('includeSeoulGroup').checked;
+
+  if (!departure || !arrival) {
+    const msg = '출발역과 도착역을 입력해주세요.';
+    log('❌ ' + msg, 'error');
+    window.showErrorBanner(msg);
+    return;
+  }
+
+  const dateStr = dateRaw ? dateRaw.replace(/-/g, '') : '';
+
+  const body = {
+    departure, arrival, dateStr, timeStr,
+    passengers, includeAdjacent, includeSeoulGroup,
+    korailId: document.getElementById('korailId').value,
+    korailPw: document.getElementById('korailPw').value,
+    telegramToken: document.getElementById('telegramToken').value,
+    telegramChatId: document.getElementById('telegramChatId').value,
+  };
+
+  setLoading(true);
+
+  if (reserve) {
+    log('──────────────────────────────────────────', 'accent');
+    log(`⚡ ${departure} ➔ ${arrival} 자동 예매 프로세스 시작`, 'accent');
+    log(`📅 날짜: ${dateStr || '오늘'} | ⏰ ${timeStr}:00 이후 | 👤 ${passengers}명`, 'info');
+    log('ℹ️ 예약 완료 시에만 텔레그램 알림 메시지가 발송됩니다.', 'info');
+  } else {
+    log('──────────────────────────────────────────', 'accent');
+    log(`🔍 ${departure} ➔ ${arrival} 열차 조회 시작 (브라우저 표출)`, 'accent');
+    log(`📅 날짜: ${dateStr || '오늘'} | ⏰ ${timeStr}:00 이후 | 👤 ${passengers}명`, 'info');
+  }
 
   try {
-    const res = await fetch('/api/search', {
+    const endpoint = reserve ? '/api/reserve' : '/api/search';
+    const res = await fetch(`${API}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        departure: departure.value.trim(),
-        arrival: arrival.value.trim(),
-        dateStr: departDate.value.replace(/-/g, ''),
-        timeStr: departTime.value,
-        korailId: korailId.value.trim(),
-        korailPw: korailPw.value.trim(),
-        telegramToken: telegramToken.value.trim(),
-        telegramChatId: telegramChatId.value.trim(),
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
+
     if (data.success) {
-      log(`✅ 열차 조회 및 텔레그램 전송 완료!`, 'success');
-      if (data.summary) {
-        log(`📋 [조회 결과]\n${data.summary}`, 'info');
+      if (!reserve) {
+        // Pure Search Mode: Display in browser table
+        log('✅ 조회 완료! 아래 [열차 조회 결과] 테이블에서 상세 내용을 확인하세요.', 'success');
+        renderResultsTable(data.results);
+        setStatus('조회 완료', '');
+      } else {
+        // Reserve Mode
+        if (data.reserved) {
+          log('🎉 [예약 완료!] 열차가 성공적으로 예매되었습니다.', 'success');
+          log('📲 텔레그램으로 완료 메시지가 발송되었습니다. 10분 내 결제하세요.', 'success');
+          setStatus('예약 완료!', 'running');
+        } else {
+          log(`ℹ️ ${data.message || '현재 잔여 좌석이 없습니다.'}`, 'warn');
+          setStatus('좌석 없음', '');
+        }
       }
     } else {
-      log(`❌ 조회 중 오류 발생: ${data.error}`, 'error');
+      const errMsg = data.error || '알 수 없는 오류가 발생했습니다.';
+      log('❌ 오류 발생: ' + errMsg, 'error');
+      window.showErrorBanner(`[백엔드 오류]\n${errMsg}`);
+      setStatus('오류 발생', 'error');
     }
-  } catch (err) {
-    log(`❌ 네트워크 오류: ${err.message}`, 'error');
+  } catch (e) {
+    const errMsg = e.message || '서버 응답 오류';
+    log('❌ 서버 연결 실패: ' + errMsg, 'error');
+    log('ℹ️ npm start 또는 KorailTicketAgent.exe 실행 확인 필요', 'warn');
+    window.showErrorBanner(`[서버 연결/네트워크 오류]\n${errMsg}`);
+    setStatus('서버 오프라인', 'error');
   } finally {
-    setStatus('준비 됨');
+    setLoading(false);
   }
+}
+
+// ─── Clear Log ────────────────────────────────
+document.getElementById('btnClearLog')?.addEventListener('click', () => {
+  document.getElementById('consoleBody').innerHTML = '';
+  log('🗑️ 로그가 지워졌습니다.', 'info');
 });
 
-// Auto Reserve
-btnReserve.addEventListener('click', async () => {
-  setStatus('예매 시도 중...', true);
-  log(`⚡ 자동 예매 시도 개시: ${departure.value} -> ${arrival.value}`, 'warning');
-  try {
-    const res = await fetch('/api/reserve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        departure: departure.value.trim(),
-        arrival: arrival.value.trim(),
-        dateStr: departDate.value.replace(/-/g, ''),
-        timeStr: departTime.value,
-        korailId: korailId.value.trim(),
-        korailPw: korailPw.value.trim(),
-      }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      log(`🎉 예매(결제 대기) 성공! 텔레그램으로 승차권 정보가 발송되었습니다.`, 'success');
-    } else {
-      log(`❌ 예매 실패: ${data.error || '예약 가능한 잔여 좌석이 없습니다.'}`, 'error');
-    }
-  } catch (err) {
-    log(`❌ 통신 오류: ${err.message}`, 'error');
-  } finally {
-    setStatus('준비 됨');
-  }
-});
-
+// ─── Init ─────────────────────────────────────
 loadConfig();
