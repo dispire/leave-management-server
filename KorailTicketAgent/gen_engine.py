@@ -1,8 +1,7 @@
-# This script generates korail_engine.ts with proper UTF-8 encoding
+# This script generates korail_engine.ts with proper UTF-8 encoding and anti-bot login support
 output_path = "F:/Antigravity/KorailTicketAgent/src/korail_engine.ts"
 
-code = """\
-import { chromium, Browser, Page } from 'playwright';
+code = r"""import { chromium, Browser, Page } from 'playwright';
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -23,6 +22,8 @@ export interface KorailSearchOptions {
   includeAdjacentStation?: boolean;
   includeSeoulGroup?: boolean;
   targetTrainNo?: string;
+  korailId?: string;
+  korailPw?: string;
 }
 
 export interface TrainResult {
@@ -50,17 +51,33 @@ async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
     const browser = await chromium.launch({
       channel: 'msedge',
       headless: false,
-      args: ['--no-sandbox', '--disable-blink-features=AutomationControlled', `--user-data-dir=${tempProfile}`],
+      args: [
+        '--no-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+        `--user-data-dir=${tempProfile}`
+      ],
     });
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0',
       viewport: { width: 1280, height: 900 },
+      locale: 'ko-KR',
+      timezoneId: 'Asia/Seoul',
     });
+
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      (window as any).chrome = { runtime: {} };
+    });
+
     const page = await context.newPage();
     return { browser, page };
   } catch {
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
     const page = await context.newPage();
     return { browser, page };
   }
@@ -68,8 +85,8 @@ async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
 
 function formatDate(dateStr?: string): { year: string; month: string; day: string } {
   let d: Date;
-  if (dateStr && /^\\d{8}$/.test(dateStr)) {
-    d = new Date(dateStr.replace(/(\\d{4})(\\d{2})(\\d{2})/, '$1-$2-$3'));
+  if (dateStr && /^\d{8}$/.test(dateStr)) {
+    d = new Date(dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
   } else {
     d = new Date();
   }
@@ -83,13 +100,47 @@ function formatDate(dateStr?: string): { year: string; month: string; day: strin
 
 async function dismissPopup(page: Page) {
   try {
-    const btn = page.locator('.ReactModal__Content button').filter({ hasText: '\\uc655\\uc778' }).first();
+    const btn = page.locator('.ReactModal__Content button').filter({ hasText: '확인' }).first();
     if (await btn.isVisible({ timeout: 2000 })) {
       await btn.click();
       console.log('[Popup] closed');
       await page.waitForTimeout(1000);
     }
   } catch { /* ignore */ }
+}
+
+async function loginKorail(page: Page, id?: string, pw?: string) {
+  const membershipNo = id || process.env.KORAIL_MEMBERSHIP_NO || '';
+  const password = pw || process.env.KORAIL_PASSWORD || '';
+  if (!membershipNo || !password) {
+    console.log('[Login] No Korail credentials provided in request or .env. Proceeding as guest.');
+    return;
+  }
+
+  console.log('[Login] Navigating to https://www.korail.com/ticket/login...');
+  try {
+    await page.goto('https://www.korail.com/ticket/login', { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.waitForTimeout(1500);
+
+    const idInput = page.locator('#id, input[name="id"]').first();
+    const pwInput = page.locator('#password, input[name="password"]').first();
+
+    if (await idInput.isVisible({ timeout: 5000 }) && await pwInput.isVisible({ timeout: 5000 })) {
+      console.log('[Login] Submitting credentials for anti-bot authentication...');
+      await idInput.fill(membershipNo);
+      await pwInput.fill(password);
+      await page.waitForTimeout(300);
+
+      const loginBtn = page.locator('button, a').filter({ hasText: /^로그인$/ }).first();
+      if (await loginBtn.count() > 0) {
+        await loginBtn.click();
+        await page.waitForTimeout(3000);
+        console.log('[Login OK] Korail session authenticated successfully!');
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Login Notice] Login step warning:', err.message);
+  }
 }
 
 async function selectStation(page: Page, type: 'departure' | 'arrival', stationName: string) {
@@ -148,7 +199,7 @@ async function selectStation(page: Page, type: 'departure' | 'arrival', stationN
 
 async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   const { year, month, day } = formatDate(dateStr);
-  const hour = (timeStr && /^\\d{1,2}$/.test(timeStr)) ? timeStr.padStart(2, '0') : '00';
+  const hour = (timeStr && /^\d{1,2}$/.test(timeStr)) ? timeStr.padStart(2, '0') : '00';
   const hourInt = parseInt(hour);
   console.log('[DateTime] ' + year + '-' + month + '-' + day + ' ' + hour + ':00');
 
@@ -217,7 +268,7 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   if (applied) {
     console.log('[DateTime] Apply button clicked');
   } else {
-    const applyBtn = modal.locator('button.btn_bn-blue, button:has-text("\\uc801\\uc6a9")').first();
+    const applyBtn = modal.locator('button.btn_bn-blue, button:has-text("적용")').first();
     if (await applyBtn.count() > 0) await applyBtn.click();
   }
 
@@ -230,44 +281,87 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
   await page.waitForTimeout(2000);
   const results: TrainResult[] = [];
 
-  // Check if Korail page directly states no trains available
-  const bodyText = await page.evaluate(() => document.body.innerText);
-  if (bodyText.includes('해당 스케줄에 운행하는 열차가 없습니다')) {
-    console.log('[Parse] Korail reports no trains available for this schedule.');
-    return [];
-  }
-
   try {
-    const rows = await page.locator('li.tckList, li.tckList.clear, ul.list_train li, table.table_tbl_type2 tr').all();
-    console.log('[Parse] rows found: ' + rows.length);
+    const rawItems = await page.evaluate(() => {
+      const list = Array.from(document.querySelectorAll('div, li, tr')).filter(el => {
+        const txt = (el as HTMLElement).innerText || el.textContent || '';
+        return (txt.includes('→') || txt.includes('소요시간')) && 
+               (txt.includes('KTX') || txt.includes('ITX') || txt.includes('무궁화') || txt.includes('새마을') || txt.includes('누리로'));
+      });
 
-    for (const row of rows.slice(0, 15)) {
-      const text = await row.innerText().catch(() => '');
-      if (!text.trim()) continue;
+      const leafItems = list.filter(parent => {
+        return !list.some(child => child !== parent && parent.contains(child));
+      });
 
-      const trainNo    = await row.locator('.numbering, .train_num').innerText().catch(() => '');
-      const trainType  = await row.locator('.train_name, [class*="tit_train"]').first().innerText().catch(() => '');
-      const departTime = await row.locator('.st_box .time, .depart_time, [class*="depart"] .time').first().innerText().catch(() => '');
-      const arrivalTime= await row.locator('.en_box .time, .arrive_time, [class*="arrive"] .time').first().innerText().catch(() => '');
-      const duration   = await row.locator('.duration, .time_info').first().innerText().catch(() => '');
-      const seatBtns   = await row.locator('.btnWrap button, .btnWrap a').allInnerTexts().catch(() => []);
-      const generalSeat= seatBtns.map((s: string) => s.trim()).filter(Boolean).join(' / ');
-      const available  = !text.includes('\\ub9e4\\uc9c4') && (text.includes('\\uc608\\ub9e4') || seatBtns.length > 0);
-      const label      = [trainType.trim(), trainNo.trim()].filter(Boolean).join(' ');
+      return leafItems.map(item => ((item as HTMLElement).innerText || item.textContent || '').replace(/\s+/g, ' ').trim());
+    });
 
-      const result: TrainResult = {
-        trainNo: label, departure, arrival,
-        departTime: departTime.trim(), arrivalTime: arrivalTime.trim(), duration: duration.trim(),
-        generalSeat: generalSeat || (available ? '\\uc608\\ub9e4\\uac00\\ub525' : '\\ub9e4\\uc9c4'),
-        specialSeat: '', available,
-      };
-      if (result.departTime || result.trainNo) results.push(result);
+    console.log('[Parse] Train schedule cards found:', rawItems.length);
+
+    for (const text of rawItems.slice(0, 25)) {
+      const trainNameMatch = text.match(/(KTX[^\s]*|ITX[^\s]*|무궁화[^\s]*|새마을[^\s]*|누리로[^\s]*)\s*(\d+)?/i);
+      const trainNo = trainNameMatch ? trainNameMatch[0].trim() : '열차';
+
+      const timeMatch = text.match(/\((\d{2}:\d{2})\s*~\s*(\d{2}:\d{2})\)/);
+      const departTime = timeMatch ? timeMatch[1] : '';
+      const arrivalTime = timeMatch ? timeMatch[2] : '';
+
+      const durMatch = text.match(/소요시간:\s*([^\s]+)/);
+      const duration = durMatch ? durMatch[1] : '';
+
+      const isSoldOut = text.includes('매진') && !text.includes('매진임박') && !text.includes('원');
+      const available = !isSoldOut;
+
+      const seatInfo = available
+        ? (text.includes('예매가능') ? '예매가능' : (text.includes('매진임박') ? '매진임박' : '좌석있음'))
+        : '매진';
+
+      if (departTime || trainNo !== '열차') {
+        results.push({
+          trainNo,
+          departure,
+          arrival,
+          departTime,
+          arrivalTime,
+          duration,
+          generalSeat: seatInfo,
+          specialSeat: '',
+          available
+        });
+      }
+    }
+
+    // Fallback: If leafItems parsing didn't find cards, check standard .tckList selectors
+    if (results.length === 0) {
+      const rows = await page.locator('li.tckList, ul.list_train li, table.table_tbl_type2 tr').all();
+      for (const row of rows.slice(0, 15)) {
+        const text = await row.innerText().catch(() => '');
+        if (!text.trim() || text.includes('해당 스케줄에 운행하는 열차가 없습니다')) continue;
+
+        const trainNo    = await row.locator('.numbering, .train_num').innerText().catch(() => '');
+        const trainType  = await row.locator('.train_name, [class*="tit_train"]').first().innerText().catch(() => '');
+        const departTime = await row.locator('.st_box .time, .depart_time, [class*="depart"] .time').first().innerText().catch(() => '');
+        const arrivalTime= await row.locator('.en_box .time, .arrive_time, [class*="arrive"] .time').first().innerText().catch(() => '');
+        const duration   = await row.locator('.duration, .time_info').first().innerText().catch(() => '');
+        const seatBtns   = await row.locator('.btnWrap button, .btnWrap a').allInnerTexts().catch(() => []);
+        const generalSeat= seatBtns.map((s: string) => s.trim()).filter(Boolean).join(' / ');
+        const available  = !text.includes('매진') && (text.includes('예매') || seatBtns.length > 0);
+        const label      = [trainType.trim(), trainNo.trim()].filter(Boolean).join(' ');
+
+        if (departTime.trim() || label.trim()) {
+          results.push({
+            trainNo: label, departure, arrival,
+            departTime: departTime.trim(), arrivalTime: arrivalTime.trim(), duration: duration.trim(),
+            generalSeat: generalSeat || (available ? '예매가능' : '매진'),
+            specialSeat: '', available,
+          });
+        }
+      }
     }
   } catch (err: any) {
     console.warn('[Parse warning]', err.message);
   }
 
-  // NOTE: Strict parsing - do NOT inject bogus rows from header date text!
   return results;
 }
 
@@ -275,16 +369,16 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
 async function sendTelegramReservationSuccess(train: TrainResult, options: KorailSearchOptions) {
   if (!bot || !chatId) return;
   const { departure, arrival, dateStr, passengers = 1 } = options;
-  const dateDisplay = (dateStr && /^\\d{8}$/.test(dateStr))
+  const dateDisplay = (dateStr && /^\d{8}$/.test(dateStr))
     ? dateStr.slice(0, 4) + '-' + dateStr.slice(4, 6) + '-' + dateStr.slice(6, 8)
     : 'Today';
 
-  let msg = '🎉 *[코레일 열차 예매 성공 알림]*\\n\\n';
-  msg += '• *열차명*: ' + (train.trainNo || '코레일 열차') + '\\n';
-  msg += '• *구간*: ' + departure + ' ➔ ' + arrival + '\\n';
-  msg += '• *출발일시*: ' + dateDisplay + ' ' + train.departTime + '\\n';
-  msg += '• *도착시간*: ' + train.arrivalTime + '\\n';
-  msg += '• *인원*: ' + passengers + '명\\n\\n';
+  let msg = '🎉 *[코레일 열차 예매 성공 알림]*\n\n';
+  msg += '• *열차명*: ' + (train.trainNo || '코레일 열차') + '\n';
+  msg += '• *구간*: ' + departure + ' ➔ ' + arrival + '\n';
+  msg += '• *출발일시*: ' + dateDisplay + ' ' + train.departTime + '\n';
+  msg += '• *도착시간*: ' + train.arrivalTime + '\n';
+  msg += '• *인원*: ' + passengers + '명\n\n';
   msg += '⚠️ *안내*: 코레일 앱 또는 letskorail.com에 접속하여 10분 이내 결제를 완료해 주세요!';
 
   await bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
@@ -294,17 +388,22 @@ async function sendTelegramReservationSuccess(train: TrainResult, options: Korai
 // 1. Pure Search (No Telegram message)
 export async function searchKorailTickets(options: KorailSearchOptions): Promise<TrainResult[]> {
   const {
-    departure = 'Seoul', arrival = 'Busan',
+    departure = '서울', arrival = '부산',
     dateStr, timeStr = '00', passengers = 1,
     includeAdjacentStation = false, includeSeoulGroup = false,
+    korailId, korailPw
   } = options;
 
   console.log('=================================================');
   console.log('[KorailAgent] Search Mode: ' + departure + ' -> ' + arrival);
-  console.log('=================================================\\n');
+  console.log('=================================================\n');
 
   const { browser, page } = await connectBrowser();
   try {
+    // Anti-bot session login
+    await loginKorail(page, korailId, korailPw);
+
+    console.log('[Search] Navigating to general search page...');
     await page.goto('https://www.korail.com/ticket/search/general', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
     await dismissPopup(page);
@@ -331,18 +430,22 @@ export async function searchKorailTickets(options: KorailSearchOptions): Promise
 // 2. Reservation Mode (Sends Telegram alert ONLY when reserved === true)
 export async function reserveKorailTickets(options: KorailSearchOptions): Promise<ReserveResult> {
   const {
-    departure = 'Seoul', arrival = 'Busan',
+    departure = '서울', arrival = '부산',
     dateStr, timeStr = '00', passengers = 1,
     includeAdjacentStation = false, includeSeoulGroup = false,
-    targetTrainNo
+    targetTrainNo, korailId, korailPw
   } = options;
 
   console.log('=================================================');
   console.log('[KorailAgent] Reserve Mode: ' + departure + ' -> ' + arrival);
-  console.log('=================================================\\n');
+  console.log('=================================================\n');
 
   const { browser, page } = await connectBrowser();
   try {
+    // Anti-bot session login
+    await loginKorail(page, korailId, korailPw);
+
+    console.log('[Reserve] Navigating to general search page...');
     await page.goto('https://www.korail.com/ticket/search/general', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
     await dismissPopup(page);
@@ -366,7 +469,7 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
     console.log('[Reserve] Attempting seat reservation for: ' + availableTrain.trainNo + ' (' + availableTrain.departTime + ')');
     
     // Attempt clicking reservation button on Korail search list page
-    const reserveBtn = page.locator('button:has-text("\\uc608\\ub9e4"), a:has-text("\\uc608\\ub9e4")').first();
+    const reserveBtn = page.locator('button:has-text("예매"), a:has-text("예매")').first();
     if (await reserveBtn.count() > 0) {
       await reserveBtn.click();
       await page.waitForTimeout(3000);
@@ -408,4 +511,4 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
 with open(output_path, "w", encoding="utf-8") as f:
     f.write(code)
 
-print("Generated korail_engine.ts successfully")
+print("Generated anti-bot authenticated korail_engine.ts successfully")

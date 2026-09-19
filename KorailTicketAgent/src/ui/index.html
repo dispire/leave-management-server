@@ -163,10 +163,23 @@
         </div>
       </section>
 
-      <!-- Right Column: Results & Real-time Console Log -->
+      <!-- Right Column: Real-time Console Log (TOP) & Results Table (BOTTOM) -->
       <section class="panel-right">
-        <!-- Train Results Card -->
-        <div class="card glass-card" id="resultsCard" style="display: none; margin-bottom: 20px;">
+        <!-- 1. Log Console Card (TOP) -->
+        <div class="card glass-card log-card">
+          <div class="card-header">
+            <h2>💻 실시간 진행 콘솔 (Live Monitor)</h2>
+            <button class="btn-text" id="btnClearLog">로그 지우기</button>
+          </div>
+          <div class="console-body" id="consoleBody">
+            <div class="log-entry info">[시스템 준비 완료] 코레일 기차표 자동 예매 시스템이 실행되었습니다.</div>
+            <div class="log-entry info">[설정] 열차 조회의 모든 결과는 브라우저 화면 하단 테이블에 표출됩니다.</div>
+            <div class="log-entry info">[알림] 자동 예매 성공 시 텔레그램으로 완료 메시지가 즉시 발송됩니다.</div>
+          </div>
+        </div>
+
+        <!-- 2. Train Results Card (BOTTOM, ALWAYS VISIBLE) -->
+        <div class="card glass-card" id="resultsCard">
           <div class="card-header">
             <h2>📋 열차 조회 결과 (브라우저 확인)</h2>
             <span class="badge badge-accent" id="resultCountBadge">0건</span>
@@ -184,22 +197,13 @@
                 </tr>
               </thead>
               <tbody id="resultsTableBody">
-                <!-- Dynamic rows -->
+                <tr>
+                  <td colspan="6" style="text-align:center; padding: 25px 15px; color: var(--text-muted); font-size: 0.88rem;">
+                    💡 왼쪽에서 여정 조건을 입력한 후 <strong>[🔍 열차 조회]</strong> 버튼을 누르면 실시간 결과가 이 테이블에 표시됩니다.
+                  </td>
+                </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-
-        <!-- Log Console Card -->
-        <div class="card glass-card log-card">
-          <div class="card-header">
-            <h2>💻 실시간 진행 콘솔 (Live Monitor)</h2>
-            <button class="btn-text" id="btnClearLog">로그 지우기</button>
-          </div>
-          <div class="console-body" id="consoleBody">
-            <div class="log-entry info">[시스템 준비 완료] 코레일 기차표 자동 예매 시스템이 실행되었습니다.</div>
-            <div class="log-entry info">[설정] 열차 조회의 모든 결과는 브라우저 화면에 표출됩니다.</div>
-            <div class="log-entry info">[알림] 자동 예매 성공 시 텔레그램으로 완료 메시지가 즉시 발송됩니다.</div>
           </div>
         </div>
       </section>
