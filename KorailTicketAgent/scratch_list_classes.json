@@ -1,0 +1,602 @@
+[
+  {
+    "tag": "DIV",
+    "id": "wrap",
+    "class": "wrap",
+    "textSample": "본문 바로가기 주메뉴 바로가기 한국철도 승차권예매 기차여행 로그인 장바구니 마이페이지 고객센터 기업전용 Language 팝업열기 승차권 철도역·열차 고객서비스 철도회원 전체 메뉴 "
+  },
+  {
+    "tag": "DIV",
+    "id": "accessibility",
+    "class": "",
+    "textSample": "본문 바로가기 주메뉴 바로가기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "header_wrap main_header_wrap",
+    "textSample": "한국철도 승차권예매 기차여행 로그인 장바구니 마이페이지 고객센터 기업전용 Language 팝업열기 승차권 철도역·열차 고객서비스 철도회원 전체 메뉴 열기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "top_popup_wrap",
+    "textSample": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다.일시정지팝업 닫기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "top_popup",
+    "textSample": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다.일시정지팝업 닫기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "slick-slider top_popup_inner slick-initialized",
+    "textSample": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다."
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "slick-list",
+    "textSample": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다."
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "slick-track",
+    "textSample": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다."
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "slick-slide slick-active slick-current",
+    "textSample": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다."
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "ctrlbtn",
+    "textSample": "일시정지"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "toppopclose",
+    "textSample": "팝업 닫기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "header_inner",
+    "textSample": "한국철도 승차권예매 기차여행 로그인 장바구니 마이페이지 고객센터 기업전용 Language 팝업열기 승차권 철도역·열차 고객서비스 철도회원 전체 메뉴 열기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "header_top",
+    "textSample": "한국철도 승차권예매 기차여행 로그인 장바구니 마이페이지 고객센터 기업전용 Language 팝업열기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "content_inner clear",
+    "textSample": "한국철도 승차권예매 기차여행 로그인 장바구니 마이페이지 고객센터 기업전용 Language 팝업열기"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "h_top_left",
+    "textSample": "한국철도 승차권예매 기차여행"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "active",
+    "textSample": "승차권예매"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "h_top_right",
+    "textSample": "로그인 장바구니 마이페이지 고객센터 기업전용 Language 팝업열기"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "loginY",
+    "textSample": "장바구니"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "loginY",
+    "textSample": "마이페이지"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "item-language",
+    "textSample": "Language"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "lang",
+    "textSample": "Language"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "dropdown",
+    "textSample": "Language"
+  },
+  {
+    "tag": "DIV",
+    "id": "langChangeContent",
+    "class": "dropdown-content",
+    "textSample": "한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "top_popup_open top_popup_btn",
+    "textSample": "팝업열기"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "top_popup_close top_popup_btn",
+    "textSample": "팝업닫기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "header_bottom",
+    "textSample": "승차권 철도역·열차 고객서비스 철도회원 전체 메뉴 열기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "content_inner clear",
+    "textSample": "승차권 철도역·열차 고객서비스 철도회원 전체 메뉴 열기"
+  },
+  {
+    "tag": "UL",
+    "id": "gnb",
+    "class": "gnb_depth1",
+    "textSample": "승차권 철도역·열차 고객서비스 철도회원"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "gnb_depth1_item gnb_depth1_item1",
+    "textSample": "승차권"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_item gnb_depth2_item1",
+    "textSample": "승차권승차권 확인예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_inner",
+    "textSample": "승차권승차권 확인예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "sgnb_title_txt",
+    "textSample": "승차권"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_list",
+    "textSample": "승차권 확인예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환불 신"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환불 신청"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "승차권 확인이용내역/영수증 조회지연료 계좌반환외부플랫폼 영수증 출력"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "자주찾는 질문(FAQ)승차권 구매/환불/분실정기승차권 구매/환불/분실장바구니/전달하기열차지연/운행중지할인쿠폰 이용방법부가운임 기준기념입장권"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "gnb_depth1_item gnb_depth1_item2",
+    "textSample": "철도역·열차"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_item gnb_depth2_item2",
+    "textSample": "철도역·열차철도역 안내역 안내노선안내역 편의 시설회의실도심공항터미널승차권 제휴할인열차 안내열차 좌석배치도열차 편의시설열차이용에티켓"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_inner",
+    "textSample": "철도역·열차철도역 안내역 안내노선안내역 편의 시설회의실도심공항터미널승차권 제휴할인열차 안내열차 좌석배치도열차 편의시설열차이용에티켓"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "sgnb_title_txt",
+    "textSample": "철도역·열차"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_list",
+    "textSample": "철도역 안내역 안내노선안내역 편의 시설회의실도심공항터미널승차권 제휴할인열차 안내열차 좌석배치도열차 편의시설열차이용에티켓"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "역 안내노선안내역 편의 시설회의실도심공항터미널승차권 제휴할인"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "열차 좌석배치도열차 편의시설열차이용에티켓"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "gnb_depth1_item gnb_depth1_item3",
+    "textSample": "고객서비스"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_item gnb_depth2_item3",
+    "textSample": "고객서비스공지사항고객센터고객의 소리 접수/조회철도고객센터서비스아이디어제안유실물 찾기유실물신고안내유실물 찾기열차서비스교통약자 배려서비스전철이용안내/지연증명전철이용안내간편지연증명서 발"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_inner",
+    "textSample": "고객서비스공지사항고객센터고객의 소리 접수/조회철도고객센터서비스아이디어제안유실물 찾기유실물신고안내유실물 찾기열차서비스교통약자 배려서비스전철이용안내/지연증명전철이용안내간편지연증명서 발"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "sgnb_title_txt",
+    "textSample": "고객서비스"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_list",
+    "textSample": "공지사항고객센터고객의 소리 접수/조회철도고객센터서비스아이디어제안유실물 찾기유실물신고안내유실물 찾기열차서비스교통약자 배려서비스전철이용안내/지연증명전철이용안내간편지연증명서 발급레일플러"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "고객의 소리 접수/조회철도고객센터서비스아이디어제안"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "유실물신고안내유실물 찾기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "전철이용안내간편지연증명서 발급"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "철도범죄신고안내암표제보"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "gnb_depth1_item gnb_depth1_item4",
+    "textSample": "철도회원"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_item gnb_depth2_item4",
+    "textSample": "철도회원소개철도회원 소개철도회원 제휴소개KTX 마일리지＆회원쿠폰철도회원 가입신청예약보관금 반환접수러브포인트 기부"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_inner",
+    "textSample": "철도회원소개철도회원 소개철도회원 제휴소개KTX 마일리지＆회원쿠폰철도회원 가입신청예약보관금 반환접수러브포인트 기부"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "sgnb_title_txt",
+    "textSample": "철도회원"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_depth2_list",
+    "textSample": "소개철도회원 소개철도회원 제휴소개KTX 마일리지＆회원쿠폰철도회원 가입신청예약보관금 반환접수러브포인트 기부"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "gnb_dep3_list",
+    "textSample": "철도회원 소개철도회원 제휴소개"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "lang_wrap",
+    "textSample": "Language한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "dropdown",
+    "textSample": "Language한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "DIV",
+    "id": "langChangeContent",
+    "class": "dropdown-content",
+    "textSample": "한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "util_wrap",
+    "textSample": "전체 메뉴 열기"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "btn_pc",
+    "textSample": "전체 메뉴 열기"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "btn_m",
+    "textSample": "전체 메뉴 열기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "allmenu_Wrap",
+    "textSample": "전체메뉴전체메뉴닫기승차권예매전체메뉴닫기장바구니승차권 예매테마열차 예매승차권 이용안내승차권 확인고객센터로그인마이페이지기업전용Language한국어English(영어)日本語(일본어)中文"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "allmenu",
+    "textSample": "전체메뉴전체메뉴닫기승차권예매전체메뉴닫기장바구니승차권 예매테마열차 예매승차권 이용안내승차권 확인고객센터로그인마이페이지기업전용Language한국어English(영어)日本語(일본어)中文"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "menu_tit",
+    "textSample": "전체메뉴전체메뉴닫기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "m_catetop_wrap",
+    "textSample": "승차권예매전체메뉴닫기장바구니승차권 예매테마열차 예매승차권 이용안내승차권 확인고객센터로그인마이페이지기업전용Language한국어English(영어)日本語(일본어)中文(简体)(중문-간체"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "m_header_top clear",
+    "textSample": "승차권예매전체메뉴닫기"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "mcate_tit",
+    "textSample": "승차권예매"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "m_header_bottom",
+    "textSample": "장바구니승차권 예매테마열차 예매승차권 이용안내승차권 확인고객센터"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "q_menu clear",
+    "textSample": "장바구니승차권 예매테마열차 예매승차권 이용안내승차권 확인고객센터"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "bottom_menu_choose",
+    "textSample": "로그인마이페이지기업전용Language한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indo"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "selectWrap",
+    "textSample": "Language한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "dropdown",
+    "textSample": "Language한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "DIV",
+    "id": "langChangeContent",
+    "class": "dropdown-content",
+    "textSample": "한국어English(영어)日本語(일본어)中文(简体)(중문-간체)中文(繁體)(중문-번체)Tiếng Việt(베트남어)ภาษาไทย(태국어)Indonesia(인니어)"
+  },
+  {
+    "tag": "DIV",
+    "id": "",
+    "class": "siteGoWrap",
+    "textSample": "한국철도기차여행"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "all_1depth clear",
+    "textSample": "승차권승차권 확인예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "on",
+    "textSample": "승차권승차권 확인예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "all_2depth",
+    "textSample": "승차권 확인예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환불 신"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " depth2_cate",
+    "textSample": "승차권 확인"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "cate_arrow depth2_cate",
+    "textSample": "예매승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "all_3depth",
+    "textSample": "승차권 예매할인상품단체승차권정기승차권예약승차권 조회 · 취소이용내역/영수증 조회"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "승차권 예매"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "할인상품"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "단체승차권"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "정기승차권"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "예약승차권 조회 · 취소"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "이용내역/영수증 조회"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "cate_arrow depth2_cate",
+    "textSample": "반환승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환불 신청"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "all_3depth",
+    "textSample": "승차권 반환역구입 승차권 환불 신청전화반환접수 안내현금결제 승차권 계좌이체 환불 신청"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "승차권 반환"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "역구입 승차권 환불 신청"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "전화반환접수 안내"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "현금결제 승차권 계좌이체 환불 신청"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": "cate_arrow depth2_cate",
+    "textSample": "비회원서비스승차권 확인이용내역/영수증 조회지연료 계좌반환외부플랫폼 영수증 출력"
+  },
+  {
+    "tag": "UL",
+    "id": "",
+    "class": "all_3depth",
+    "textSample": "승차권 확인이용내역/영수증 조회지연료 계좌반환외부플랫폼 영수증 출력"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "승차권 확인"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "class": " ",
+    "textSample": "이용내역/영수증 조회"
+  }
+]

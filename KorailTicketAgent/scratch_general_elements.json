@@ -1,0 +1,2554 @@
+[
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "본문 바로가기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "주메뉴 바로가기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "slide_detail",
+    "text": "홈페이지 로그인이 안되시는 분은 인터넷 기록을 삭제 후 재접속해 주시기 바랍니다.",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "stop",
+    "text": "일시정지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "topclose_btn",
+    "text": "팝업 닫기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "한국철도",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "기차여행",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "HOME",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "btnGoLogin",
+    "text": "로그인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "장바구니",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "마이페이지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "고객센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "기업전용",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "langChangeButton",
+    "class": "dropdown-button",
+    "text": "Language",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "한국어",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "English(영어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "日本語(일본어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "中文(简体)(중문-간체)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "中文(繁體)(중문-번체)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "Tiếng Việt(베트남어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "ภาษาไทย(태국어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "Indonesia(인니어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "팝업열기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "팝업닫기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "depth1",
+    "text": "승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "승차권 확인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "승차권 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "할인상품",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "단체승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "정기승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "예약승차권 조회 · 취소",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "이용내역/영수증 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "승차권 반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "역구입 승차권 환불 신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "전화반환접수 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "현금결제 승차권 계좌이체 환불 신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "비회원서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "승차권 확인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "이용내역/영수증 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "지연료 계좌반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "외부플랫폼 영수증 출력",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "이용안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "자주찾는 질문(FAQ)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "승차권 구매/환불/분실",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "정기승차권 구매/환불/분실",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "장바구니/전달하기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "열차지연/운행중지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "할인쿠폰 이용방법",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "부가운임 기준",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "기념입장권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "할인제도 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "열차운임/시간표",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "광명역 공항버스 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "depth1",
+    "text": "철도역·열차",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "철도역 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "역 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "노선안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "역 편의 시설",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "회의실",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "도심공항터미널",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "승차권 제휴할인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "열차 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "열차 좌석배치도",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "열차 편의시설",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "열차이용에티켓",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "depth1",
+    "text": "고객서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "공지사항",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "고객센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "고객의 소리 접수/조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "철도고객센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "서비스아이디어제안",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "유실물 찾기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "유실물신고안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "유실물 찾기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "열차서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "교통약자 배려서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "전철이용안내/지연증명",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "전철이용안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "간편지연증명서 발급",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "레일플러스 교통카드",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "철도범죄신고",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "철도범죄신고안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "암표제보",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "광고안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "철도시민안전신고센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "depth1",
+    "text": "철도회원",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3_open",
+    "text": "소개",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "철도회원 소개",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep4",
+    "text": "철도회원 제휴소개",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "KTX 마일리지＆회원쿠폰",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "철도회원 가입신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "예약보관금 반환접수",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "gnb_dep3",
+    "text": "러브포인트 기부",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "langChangeButton",
+    "class": "dropdown-button",
+    "text": "Language",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "한국어",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "English(영어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "日本語(일본어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "中文(简体)(중문-간체)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "中文(繁體)(중문-번체)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "Tiếng Việt(베트남어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "ภาษาไทย(태국어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "Indonesia(인니어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "btn-allmenu",
+    "text": "전체 메뉴 열기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "btn-allmenu_m",
+    "text": "전체 메뉴 열기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "allclose",
+    "text": "전체메뉴닫기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "m_allclose",
+    "text": "전체메뉴닫기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "q_menu_icon",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "q_menu_icon",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "q_menu_icon",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "q_menu_icon",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "q_menu_icon",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "logoutBtn",
+    "text": "로그인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "mypageBtn",
+    "text": "마이페이지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "mypageBtn",
+    "text": "기업전용",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "langChangeButton",
+    "class": "dropdown-button",
+    "text": "Language",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "한국어",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "English(영어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "日本語(일본어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "中文(简体)(중문-간체)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "中文(繁體)(중문-번체)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "Tiếng Việt(베트남어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "ภาษาไทย(태국어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "Indonesia(인니어)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "",
+    "text": "한국철도",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "",
+    "text": "기차여행",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 확인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "할인상품",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "단체승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "정기승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "예약승차권 조회 · 취소",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이용내역/영수증 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "역구입 승차권 환불 신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "전화반환접수 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "현금결제 승차권 계좌이체 환불 신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "비회원서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 확인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이용내역/영수증 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "지연료 계좌반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "외부플랫폼 영수증 출력",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이용안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "자주찾는 질문(FAQ)",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 구매/환불/분실",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "정기승차권 구매/환불/분실",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "장바구니/전달하기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차지연/운행중지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "할인쿠폰 이용방법",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "부가운임 기준",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "기념입장권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "할인제도 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차운임/시간표",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "광명역 공항버스 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도역·열차",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도역 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "역 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "노선안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "역 편의 시설",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "회의실",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "도심공항터미널",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 제휴할인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차 좌석배치도",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차 편의시설",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차이용에티켓",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "고객서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "공지사항",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "고객센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "고객의 소리 접수/조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도고객센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "서비스아이디어제안",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "유실물 찾기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "유실물신고안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "유실물 찾기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "교통약자 배려서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "전철이용안내/지연증명",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "전철이용안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "간편지연증명서 발급",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "레일플러스 교통카드",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도범죄신고",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도범죄신고안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "암표제보",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "광고안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도시민안전신고센터",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도회원",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "소개",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도회원 소개",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도회원 제휴소개",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "KTX 마일리지＆회원쿠폰",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도회원 가입신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "예약보관금 반환접수",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "러브포인트 기부",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "마이페이지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "마이코레일",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 정보",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 확인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "예약승차권 조회/취소",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "승차권 구입이력",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "SR 승차권 구입이력",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이용내역/영수증 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "결제수단별 발권내역",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "현금영수증 자진발급내역 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "기차여행정보",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "여행상품 예약내역",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "여행상품 1:1문의",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "나의 관심상품",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "자유여행패스 이용내역",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "단체(2~1개월전) 접수내역",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "회원 실적 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "마일리지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "할인쿠폰",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "일반열차 이용실적",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "결제관리",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "간편구매 정보등록",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "간편현금결제 설정",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차운행중지 및 지연배상",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차지연배상신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "열차운행중지배상 신청",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "회원정보관리",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "나의정보수정",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "비밀번호 변경",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이메일/휴대폰인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "다자녀 행복 인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "장애인인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "맘편한KTX 인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "맞춤형 우대예약 인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "기차누리 인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "유공자 명절사전예매대상 인증",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "회원탈퇴",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "장바구니",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "backbtn",
+    "text": "뒤로가기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "홈",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "path_button",
+    "text": "승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "철도역·열차",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "고객서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "철도회원",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "안내사항",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "마이페이지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "path_button",
+    "text": "예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "승차권 확인",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "반환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "비회원서비스",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "이용안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "할인제도 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "열차운임/시간표",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "광명역 공항버스 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "path_button",
+    "text": "승차권 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "승차권 예매",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "할인상품",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "단체승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "정기승차권",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "예약승차권 조회 · 취소",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "basic_anchor",
+    "text": "이용내역/영수증 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "share_button hidden",
+    "text": "공유",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "share_close",
+    "text": "공유하기 닫기",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "sns_anchor",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "sns_anchor",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "sns_anchor",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "sns_anchor",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "print_button",
+    "text": "인쇄",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "INPUT",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "출발역",
+    "value": "서울"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "btn_pop btn_end btn_pop-open",
+    "text": "출발역 선택",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "btnChange",
+    "text": "출발지/도착지 전환",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "INPUT",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "도착역",
+    "value": "부산"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "btn_pop btn_end btn_pop-open",
+    "text": "도착역 선택",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "INPUT",
+    "id": "shuttle01",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": "on"
+  },
+  {
+    "tag": "INPUT",
+    "id": "startDate",
+    "class": "data",
+    "text": "",
+    "placeholder": "날짜를 선택해주세요",
+    "value": "2026-09-19(토) 11:00"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "btn_pop btn_d-day",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "data btn_pop",
+    "text": "총 1명",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "btnToggle fl-r",
+    "text": "확대",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "INPUT",
+    "id": "option01",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": "Y"
+  },
+  {
+    "tag": "INPUT",
+    "id": "option02",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": "N"
+  },
+  {
+    "tag": "INPUT",
+    "id": "option05",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": "Y"
+  },
+  {
+    "tag": "INPUT",
+    "id": "option06",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": "N"
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "btn_lookup",
+    "text": "열차 조회",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "go-to-top__btn hidden",
+    "text": " 위로 가기 ",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이용약관",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "여객운송약관 및 부속약관",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "개인정보처리방침",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이메일무단수집거부",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "저작권정책",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "지원 브라우저 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이용약관",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "여객운송약관 및 부속약관",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "개인정보처리방침",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이메일무단수집거부",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "저작권정책",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "지원 브라우저 안내",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "relatedSiteButton",
+    "class": "dropdown-button",
+    "text": "관련 사이트",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "코레일 홈페이지",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "물류정보",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "윤리경영",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "이사회 커뮤니티",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "조달·입찰",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "철도박물관",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "class": "",
+    "text": "",
+    "placeholder": "",
+    "value": ""
+  }
+]

@@ -435,32 +435,81 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
 
     console.log('[Reserve] 좌석 예매 시도: ' + availableTrain.trainNo + ' (' + availableTrain.departTime + ')');
     
-    // Attempt clicking reservation button on Korail search list page
-    const reserveBtn = page.locator('button:has-text("예매"), a:has-text("예매")').first();
-    if (await reserveBtn.count() > 0) {
-      await reserveBtn.click();
-      await page.waitForTimeout(3000);
+    // Locate and click the reservation button in the SPECIFIC matching train row (excluding GNB header)
+    const clicked = await page.evaluate(({ targetNo, targetDepTime }: { targetNo: string; targetDepTime: string }) => {
+      const container = document.querySelector('#content') || document.body;
+      const rows = Array.from(container.querySelectorAll('tr, li, div[class*="tck"], div[class*="train"], div[class*="item"], div[class*="list"]')).filter(r => {
+        const isHeader = r.closest('header, nav, .header, .head, .gnb, .top_menu');
+        if (isHeader) return false;
+        const txt = (r as HTMLElement).innerText || '';
+        return (targetNo && txt.includes(targetNo)) || (targetDepTime && txt.includes(targetDepTime));
+      });
 
-      await dismissPopup(page);
+      if (rows.length === 0) return false;
 
-      const pageContent = await page.evaluate(() => document.body.innerText);
-      const isReserved = pageContent.includes('결제') || pageContent.includes('예약') || pageContent.includes('장바구니');
+      // Find reservation button inside matching row
+      const targetRow = rows[0];
+      const buttons = Array.from(targetRow.querySelectorAll('button, a, input[type="button"]')) as HTMLElement[];
+      const reserveBtn = buttons.find(b => {
+        const txt = b.innerText || b.textContent || '';
+        const cls = b.className || '';
+        return (txt.includes('예매') || txt.includes('좌석') || cls.includes('res') || cls.includes('reserve')) && !b.hasAttribute('disabled');
+      });
 
-      if (isReserved) {
-        await sendTelegramReservationSuccess(availableTrain, options);
-        return {
-          success: true,
-          reserved: true,
-          message: '성공적으로 예매가 진행되었습니다! 텔레그램으로 결제 안내 알림을 발송했습니다.',
-          reservedTrain: availableTrain
-        };
+      if (reserveBtn) {
+        reserveBtn.click();
+        return true;
       }
+      return false;
+    }, { targetNo: availableTrain.trainNo, targetDepTime: availableTrain.departTime });
+
+    if (!clicked) {
+      console.log('[Reserve] 해당 열차 항목에서 예매 버튼을 찾지 못했습니다.');
+      return {
+        success: true,
+        reserved: false,
+        message: '해당 열차 항목에서 예매 버튼을 클릭하지 못했습니다. (비회원 또는 예약 불가 상태)',
+        reservedTrain: availableTrain
+      };
     }
 
+    await page.waitForTimeout(4000);
+    await dismissPopup(page);
+
+    // Verify true reservation success:
+    // 1. URL must contain reservation/payment/cart endpoints (/ticket/reservation/, /ticket/payment/, /ticket/cart)
+    // 2. OR main content container (#content) text must explicitly contain reservation confirmation terms: '결제기한', '예약번호', '예약이 완료되었습니다', '승차권 예약 완료'
+    // MUST NOT match GNB menu text ('장바구니', '예약', '결제') on general search pages!
+    const currentUrl = page.url();
+    const contentText = await page.evaluate(() => {
+      const contentEl = document.querySelector('#content') || document.querySelector('main');
+      return contentEl ? (contentEl as HTMLElement).innerText : '';
+    });
+
+    const isTrueReservationPage = currentUrl.includes('/reservation/') || currentUrl.includes('/payment/') || currentUrl.includes('/cart');
+    const isTrueReservationContent = contentText.includes('결제기한') || 
+                                     contentText.includes('예약번호') || 
+                                     contentText.includes('예약이 완료') || 
+                                     contentText.includes('승차권 예약 완료');
+
+    const isReserved = isTrueReservationPage || isTrueReservationContent;
+
+    if (isReserved) {
+      console.log('[Reserve OK] 예매 성공 확인됨! (URL: ' + currentUrl + ')');
+      await sendTelegramReservationSuccess(availableTrain, options);
+      return {
+        success: true,
+        reserved: true,
+        message: '성공적으로 예매가 진행되었습니다! 텔레그램으로 결제 안내 알림을 발송했습니다.',
+        reservedTrain: availableTrain
+      };
+    }
+
+    console.log('[Reserve Notice] 결제/예약완료 페이지로 전환되지 않음. Current URL:', currentUrl);
     return {
       success: true,
       reserved: false,
-      message: '좌석 예매 시도 중 결제 페이지 전환이 완료되지 않았습니다.',
+      message: '좌석 예매 버튼을 클릭했으나 실제 코레일 예약완료/결제 페이지로 전환되지 않았습니다. (회원 로그인 상태 및 잔여 좌석 확인 필요)',
       reservedTrain: availableTrain
     };
 
