@@ -276,13 +276,32 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
   const results: TrainResult[] = [];
 
   try {
+    // 1. Check if page explicitly indicates no trains available
+    const isNoTrain = await page.evaluate(() => {
+      const container = document.querySelector('#content') || document.body;
+      const text = (container as HTMLElement).innerText || '';
+      return text.includes('해당 스케줄에 운행하는 열차가 없습니다') ||
+             text.includes('조회된 열차가 없습니다') ||
+             text.includes('운행열차가 없습니다');
+    });
+
+    if (isNoTrain) {
+      console.log('[Parse] 운행 열차가 없습니다. (0건)');
+      return [];
+    }
+
     const rawTexts = await page.evaluate(() => {
-      const nodes = Array.from(document.querySelectorAll('.tckList, li[class*="List"], tr, div[class*="tck_box"], div[class*="ticket_box"], ul.list_ticket > li, .list_train li'));
+      const container = document.querySelector('#content') || document.body;
+      const nodes = Array.from(container.querySelectorAll('.tckList, li[class*="List"], tr, div[class*="tck_box"], div[class*="ticket_box"], ul.list_ticket > li, .list_train li')).filter(n => {
+        return !n.closest('header, nav, .header, .head, .gnb, .top_menu, .path_wrap, .breadcrumb');
+      });
+
       if (nodes.length > 0) {
         return nodes.map(n => ((n as HTMLElement).innerText || '').replace(/\s+/g, ' ').trim()).filter(t => t.length > 10);
       }
       
-      const allDivs = Array.from(document.querySelectorAll('div, li')).filter(el => {
+      const allDivs = Array.from(container.querySelectorAll('div, li')).filter(el => {
+        if (el.closest('header, nav, .header, .head, .gnb, .top_menu, .path_wrap, .breadcrumb')) return false;
         const txt = (el as HTMLElement).innerText || '';
         return (txt.includes('→') || txt.includes('->') || txt.includes('소요시간')) && 
                (txt.includes('KTX') || txt.includes('ITX') || txt.includes('무궁화') || txt.includes('새마을') || txt.includes('누리로'));
@@ -296,9 +315,14 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
       if (!text || text.includes('해당 스케줄에 운행하는 열차가 없습니다')) continue;
 
       const trainNameMatch = text.match(/(KTX[^\s]*|ITX[^\s]*|무궁화[^\s]*|새마을[^\s]*|누리로[^\s]*)\s*(\d+)?/i);
-      const trainNo = trainNameMatch ? trainNameMatch[0].trim() : '코레일 열차';
-
       const times = text.match(/\d{2}:\d{2}/g);
+
+      // Must have at least train name OR both departure/arrival times to be a valid row
+      if (!trainNameMatch && (!times || times.length < 2)) {
+        continue;
+      }
+
+      const trainNo = trainNameMatch ? trainNameMatch[0].trim() : '코레일 열차';
       const departTime = times ? times[0] : '';
       const arrivalTime = (times && times.length > 1) ? times[1] : '';
 
@@ -311,7 +335,7 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
         ? (text.includes('매진임박') ? '매진임박' : '예매가능')
         : '매진';
 
-      if (departTime || trainNo !== '코레일 열차') {
+      if (departTime && arrivalTime) {
         results.push({
           trainNo,
           departure,
