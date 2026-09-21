@@ -58,11 +58,19 @@ async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
     });
 
     const page = await context.newPage();
+    page.on('dialog', async dialog => {
+      console.log('[Korail Alert Dialog]', dialog.type(), dialog.message());
+      await dialog.accept().catch(() => {});
+    });
     return { browser, page };
   } catch {
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
+    page.on('dialog', async dialog => {
+      console.log('[Korail Alert Dialog]', dialog.type(), dialog.message());
+      await dialog.accept().catch(() => {});
+    });
     return { browser, page };
   }
 }
@@ -459,28 +467,42 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
     // Locate and click the reservation button in the SPECIFIC matching train row (excluding GNB header)
     const clicked = await page.evaluate(({ targetNo, targetDepTime }: { targetNo: string; targetDepTime: string }) => {
       const container = document.querySelector('#content') || document.body;
-      const rows = Array.from(container.querySelectorAll('tr, li, div[class*="tck"], div[class*="train"], div[class*="item"], div[class*="list"]')).filter(r => {
-        const isHeader = r.closest('header, nav, .header, .head, .gnb, .top_menu');
+      const cleanTargetNo = (targetNo || '').replace(/\s+/g, '');
+
+      // 1. Find matching train row by departure time or train number
+      const rows = Array.from(container.querySelectorAll('tr, li, div[class*="tck"], div[class*="train"], div[class*="item"], div[class*="list"], div[class*="schedule"]')).filter(r => {
+        const isHeader = r.closest('header, nav, .header, .head, .gnb, .top_menu, .path_wrap, .breadcrumb');
         if (isHeader) return false;
         const txt = (r as HTMLElement).innerText || '';
-        return (targetNo && txt.includes(targetNo)) || (targetDepTime && txt.includes(targetDepTime));
+        const cleanTxt = txt.replace(/\s+/g, '');
+        return (targetDepTime && txt.includes(targetDepTime)) || (cleanTargetNo && cleanTxt.includes(cleanTargetNo));
       });
 
       if (rows.length === 0) return false;
 
-      // Find reservation button inside matching row
+      // 2. Find reservation button inside matching row
       const targetRow = rows[0];
-      const buttons = Array.from(targetRow.querySelectorAll('button, a, input[type="button"]')) as HTMLElement[];
-      const reserveBtn = buttons.find(b => {
-        const txt = b.innerText || b.textContent || '';
+      const clickables = Array.from(targetRow.querySelectorAll('button, a, input, span, div, td')) as HTMLElement[];
+      const reserveBtn = clickables.find(b => {
+        const txt = (b.innerText || b.textContent || '').trim();
         const cls = b.className || '';
-        return (txt.includes('예매') || txt.includes('좌석') || cls.includes('res') || cls.includes('reserve')) && !b.hasAttribute('disabled');
+        const isTarget = (txt === '예매' || txt === '좌석선택' || txt.includes('예매') || txt.includes('좌석') || txt.includes('일반실') || txt.includes('특실') || cls.includes('res') || cls.includes('reserve')) &&
+                         !b.hasAttribute('disabled') && !cls.includes('disabled');
+        return isTarget;
       });
 
       if (reserveBtn) {
         reserveBtn.click();
         return true;
       }
+
+      // Fallback: click first non-disabled button or link in targetRow
+      const fallbackBtn = clickables.find(b => (b.tagName === 'BUTTON' || b.tagName === 'A' || b.tagName === 'INPUT') && !b.hasAttribute('disabled') && !b.className.includes('disabled'));
+      if (fallbackBtn) {
+        fallbackBtn.click();
+        return true;
+      }
+
       return false;
     }, { targetNo: availableTrain.trainNo, targetDepTime: availableTrain.departTime });
 

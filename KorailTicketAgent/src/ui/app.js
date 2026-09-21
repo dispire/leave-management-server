@@ -168,12 +168,93 @@ function renderResultsTable(results, departure, arrival, dateStr, timeStr) {
   });
 }
 
+// Auto Sniper Mode State
+let sniperActive = false;
+let sniperTimer = null;
+let sniperCount = 0;
+
+document.getElementById('btnSniper')?.addEventListener('click', () => {
+  if (sniperActive) {
+    stopSniperMode();
+  } else {
+    startSniperMode();
+  }
+});
+
+function startSniperMode() {
+  const departure = document.getElementById('departure').value.trim();
+  const arrival   = document.getElementById('arrival').value.trim();
+  const korailId  = document.getElementById('korailId').value.trim();
+  const korailPw  = document.getElementById('korailPw').value.trim();
+
+  if (!departure || !arrival) {
+    const msg = '출발역과 도착역을 먼저 입력해주세요.';
+    log('❌ ' + msg, 'error');
+    window.showErrorBanner(msg);
+    return;
+  }
+
+  if (!korailId || !korailPw) {
+    log('⚠️ [안내] 코레일 회원 로그인 정보가 비어있습니다. 실제 승차권 결제 단계 진입을 위해 설정 카드에 코레일 ID/PW를 입력 후 저장하세요.', 'warn');
+  }
+
+  sniperActive = true;
+  sniperCount = 0;
+  const btn = document.getElementById('btnSniper');
+  if (btn) {
+    btn.classList.add('active');
+    btn.querySelector('span').textContent = '⏹️ 매복 감시 중단';
+  }
+
+  log('──────────────────────────────────────────', 'accent');
+  log(`🎯 [취소표/자동 예매 매복 모드 시작] ${departure} ➔ ${arrival}`, 'accent');
+  log('ℹ️ 잔여 좌석 발생 시 즉시 자동 예약하며, 5초 간격으로 연속 재시도합니다.', 'info');
+
+  runSniperLoop();
+}
+
+function stopSniperMode() {
+  sniperActive = false;
+  if (sniperTimer) clearTimeout(sniperTimer);
+  sniperTimer = null;
+  const btn = document.getElementById('btnSniper');
+  if (btn) {
+    btn.classList.remove('active');
+    btn.querySelector('span').textContent = '🔄 취소표/자동 예매 매복 시작';
+  }
+  log('🛑 [매복 감시 중단] 자동 매복 프로세스가 중지되었습니다.', 'warn');
+  setStatus('매복 중단', '');
+}
+
+async function runSniperLoop() {
+  if (!sniperActive) return;
+  sniperCount++;
+  log(`[매복 ${sniperCount}회차 시도] 실시간 좌석 확보 재시도 중...`, 'info');
+  setStatus(`매복 ${sniperCount}회차 시도`, 'running');
+
+  try {
+    const isReserved = await doSearch(true, true);
+    if (isReserved) {
+      log(`🎉 [매복 성공!] 총 ${sniperCount}회차 시도 만에 기차표 정식 예매에 성공했습니다!`, 'success');
+      stopSniperMode();
+      return;
+    }
+  } catch (err) {
+    log(`⚠️ 매복 시도 중 예외 안내: ${err.message}`, 'warn');
+  }
+
+  if (sniperActive) {
+    log(`⏳ [매복 ${sniperCount}회차 완료] 잔여 좌석 없음 - 5초 후 자동 재시도합니다...`, 'info');
+    sniperTimer = setTimeout(runSniperLoop, 5000);
+  }
+}
+
 window.reserveSingleTrain = function(trainNo, departTime) {
   log(`⚡ [선택 열차 예매 시도] ${trainNo} (${departTime})`, 'accent');
   doSearch(true);
 };
 
-async function doSearch(reserve = false) {
+async function doSearch(reserve = false, isSniper = false) {
   window.hideErrorBanner();
 
   const departure   = document.getElementById('departure').value.trim();
@@ -183,12 +264,18 @@ async function doSearch(reserve = false) {
   const passengers  = parseInt(document.getElementById('passengers').value) || 1;
   const includeAdjacent   = document.getElementById('includeAdjacent').checked;
   const includeSeoulGroup = document.getElementById('includeSeoulGroup').checked;
+  const korailId    = document.getElementById('korailId').value.trim();
+  const korailPw    = document.getElementById('korailPw').value.trim();
 
   if (!departure || !arrival) {
     const msg = '출발역과 도착역을 입력해주세요.';
     log('❌ ' + msg, 'error');
     window.showErrorBanner(msg);
-    return;
+    return false;
+  }
+
+  if (reserve && !korailId) {
+    log('⚠️ [안내] 코레일 멤버십 번호(ID)가 입력되지 않아 비회원 조회 상태입니다. 실제 승차권 예약 및 결제 진행을 위해 코레일 ID/PW를 입력하세요.', 'warn');
   }
 
   const dateStr = dateRaw ? dateRaw.replace(/-/g, '') : '';
@@ -196,23 +283,24 @@ async function doSearch(reserve = false) {
   const body = {
     departure, arrival, dateStr, timeStr,
     passengers, includeAdjacent, includeSeoulGroup,
-    korailId: document.getElementById('korailId').value,
-    korailPw: document.getElementById('korailPw').value,
+    korailId, korailPw,
     telegramToken: document.getElementById('telegramToken').value,
     telegramChatId: document.getElementById('telegramChatId').value,
   };
 
-  setLoading(true);
+  if (!isSniper) setLoading(true);
 
-  if (reserve) {
-    log('──────────────────────────────────────────', 'accent');
-    log(`⚡ ${departure} ➔ ${arrival} 자동 예매 프로세스 시작`, 'accent');
-    log(`📅 날짜: ${dateStr || '오늘'} | ⏰ ${timeStr}:00 이후 | 👤 ${passengers}명`, 'info');
-    log('ℹ️ 예약 완료 시에만 텔레그램 알림 메시지가 발송됩니다.', 'info');
-  } else {
-    log('──────────────────────────────────────────', 'accent');
-    log(`🔍 ${departure} ➔ ${arrival} 열차 조회 시작 (브라우저 표출)`, 'accent');
-    log(`📅 날짜: ${dateStr || '오늘'} | ⏰ ${timeStr}:00 이후 | 👤 ${passengers}명`, 'info');
+  if (!isSniper) {
+    if (reserve) {
+      log('──────────────────────────────────────────', 'accent');
+      log(`⚡ ${departure} ➔ ${arrival} 자동 예매 프로세스 시작`, 'accent');
+      log(`📅 날짜: ${dateStr || '오늘'} | ⏰ ${timeStr}:00 이후 | 👤 ${passengers}명`, 'info');
+      log('ℹ️ 예약 완료 시에만 텔레그램 알림 메시지가 발송됩니다.', 'info');
+    } else {
+      log('──────────────────────────────────────────', 'accent');
+      log(`🔍 ${departure} ➔ ${arrival} 열차 조회 시작 (브라우저 표출)`, 'accent');
+      log(`📅 날짜: ${dateStr || '오늘'} | ⏰ ${timeStr}:00 이후 | 👤 ${passengers}명`, 'info');
+    }
   }
 
   try {
@@ -234,6 +322,7 @@ async function doSearch(reserve = false) {
         }
         renderResultsTable(data.results, departure, arrival, dateStr, timeStr);
         setStatus(data.results && data.results.length > 0 ? '조회 완료' : '결과 없음', '');
+        return false;
       } else {
         // Reserve Mode
         if (data.reserved) {
@@ -243,10 +332,12 @@ async function doSearch(reserve = false) {
           if (data.reservedTrain) {
             renderResultsTable([data.reservedTrain], departure, arrival, dateStr, timeStr);
           }
+          return true;
         } else {
           log(`ℹ️ ${data.message || '현재 잔여 좌석이 없습니다.'}`, 'warn');
           renderResultsTable([], departure, arrival, dateStr, timeStr);
-          setStatus('좌석 없음', '');
+          if (!isSniper) setStatus('좌석 없음', '');
+          return false;
         }
       }
     } else {
@@ -254,6 +345,7 @@ async function doSearch(reserve = false) {
       log('❌ 오류 발생: ' + errMsg, 'error');
       window.showErrorBanner(`[백엔드 오류]\n${errMsg}`);
       setStatus('오류 발생', 'error');
+      return false;
     }
   } catch (e) {
     const errMsg = e.message || '서버 응답 오류';
@@ -261,8 +353,9 @@ async function doSearch(reserve = false) {
     log('ℹ️ npm start 또는 KorailTicketAgent.exe 실행 확인 필요', 'warn');
     window.showErrorBanner(`[서버 연결/네트워크 오류]\n${errMsg}`);
     setStatus('서버 오프라인', 'error');
+    return false;
   } finally {
-    setLoading(false);
+    if (!isSniper) setLoading(false);
   }
 }
 
