@@ -151,6 +151,8 @@ async function loginKorail(page: Page, id?: string, pw?: string) {
 
 async function selectStation(page: Page, type: 'departure' | 'arrival', stationName: string) {
   console.log('[Station] ' + (type === 'departure' ? '출발역' : '도착역') + ': ' + stationName);
+  await dismissPopup(page);
+
   const btnSelector = type === 'departure' ? '.start a.btn_pop-open' : '.end a.btn_pop-open';
   await page.locator(btnSelector).click();
   await page.waitForTimeout(1000);
@@ -164,7 +166,8 @@ async function selectStation(page: Page, type: 'departure' | 'arrival', stationN
     const txt = (await tagLinks.nth(i).innerText()).trim();
     if (txt === stationName) {
       await tagLinks.nth(i).click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(800);
+      await dismissPopup(page);
       console.log('[Station OK] 태그 선택: ' + stationName);
       return;
     }
@@ -185,10 +188,11 @@ async function selectStation(page: Page, type: 'departure' | 'arrival', stationN
   if (await searchBtn.count() > 0) await searchBtn.click();
   await page.waitForTimeout(800);
 
-  const resultItem = modal.locator('a:has-text("' + stationName + '"), button:has-text("' + stationName + '")').first();
+  const resultItem = modal.locator('.ReactModal__Content a:has-text("' + stationName + '"), .ReactModal__Content button:has-text("' + stationName + '")').first();
   if (await resultItem.count() > 0) {
     await resultItem.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(800);
+    await dismissPopup(page);
     console.log('[Station OK] 검색 선택: ' + stationName);
     return;
   }
@@ -199,7 +203,8 @@ async function selectStation(page: Page, type: 'departure' | 'arrival', stationN
     const el = Array.from(m.querySelectorAll('a, button, span')).find(e => e.textContent?.trim() === name) as HTMLElement | undefined;
     if (el) el.click();
   }, stationName);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(800);
+  await dismissPopup(page);
   console.log('[Station OK] JS 선택: ' + stationName);
 }
 
@@ -209,6 +214,7 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   const hourInt = parseInt(hour);
   console.log('[DateTime] ' + year + '-' + month + '-' + day + ' ' + hour + ':00');
 
+  await dismissPopup(page);
   await page.locator('a.btn_d-day').click();
   await page.waitForTimeout(1000);
 
@@ -237,22 +243,25 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   }
   await page.waitForTimeout(500);
 
-  // Hour selection
-  const hourTarget = String(hourInt) + '시';
-  const hourClicked = await page.evaluate((targetH: string) => {
+  // Hour selection (matches both "8시" and "08시" and "08")
+  const hourClicked = await page.evaluate((targetHInt: number) => {
     const modalEl = document.querySelector('.ReactModal__Content');
     if (!modalEl) return false;
-    const links = Array.from(modalEl.querySelectorAll('li a, .hour_box a, a'));
-    const found = links.find(el => (el as HTMLElement).innerText.trim() === targetH);
+    const links = Array.from(modalEl.querySelectorAll('li a, .hour_box a, a, button'));
+    const found = links.find(el => {
+      const txt = (el as HTMLElement).innerText.trim();
+      const val = parseInt(txt);
+      return !isNaN(val) && val === targetHInt;
+    });
     if (found) {
       (found as HTMLElement).click();
       return true;
     }
     return false;
-  }, hourTarget);
+  }, hourInt);
 
   if (hourClicked) {
-    console.log('[DateTime] 시간 클릭: ' + hourTarget);
+    console.log('[DateTime] 시간 클릭: ' + hourInt + '시');
   }
   await page.waitForTimeout(500);
 
@@ -275,6 +284,7 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   }
 
   await page.waitForTimeout(1000);
+  await dismissPopup(page);
   console.log('[DateTime OK] 설정 완료: ' + year + '-' + month + '-' + day + ' ' + hour + ':00');
 }
 
