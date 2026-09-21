@@ -46,18 +46,23 @@ export interface ReserveResult {
 }
 
 async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
-  const tempProfile = path.join(os.tmpdir(), 'korail_agent_profile_' + Date.now());
   try {
     const browser = await chromium.launch({
-      channel: 'msedge',
       headless: false,
-      args: ['--no-sandbox', '--disable-blink-features=AutomationControlled', `--user-data-dir=${tempProfile}`],
+      args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
     });
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0',
       viewport: { width: 1280, height: 900 },
       locale: 'ko-KR',
       timezoneId: 'Asia/Seoul',
+    });
+
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      (window as any).chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} };
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['ko-KR', 'ko', 'en-US', 'en'] });
     });
 
     const page = await context.newPage();
@@ -69,6 +74,10 @@ async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
   } catch {
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      (window as any).chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} };
+    });
     const page = await context.newPage();
     page.on('dialog', async dialog => {
       console.log('[Korail Alert Dialog]', dialog.type(), dialog.message());
@@ -125,12 +134,19 @@ async function loginKorail(page: Page, id?: string, pw?: string) {
 
   console.log('[Login] 코레일 로그인 페이지 접속 중...');
   try {
-    await page.goto('https://www.korail.com/ticket/login', { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.goto('https://www.korail.com/ticket/login', { waitUntil: 'networkidle', timeout: 20000 });
     await page.waitForTimeout(1500);
 
-    const initialText = await page.evaluate(() => document.body.innerText);
-    if (initialText.includes('로그아웃') || initialText.includes('마이페이지')) {
-      console.log('[Login OK] 이미 로그인된 회원 세션입니다.');
+    // Check if already authenticated via loginCheck API
+    const checkInitial = await page.evaluate(async () => {
+      try {
+        const res = await fetch('https://www.korail.com/ebizweb/common/loginCheck?Device=BH&Version=999999999');
+        return await res.json();
+      } catch { return null; }
+    });
+
+    if (checkInitial && checkInitial.strResult === 'SUCC' && checkInitial.strCustNm) {
+      console.log(`[Login OK] 이미 로그인된 회원 세션입니다. (회원명: ${checkInitial.strCustNm}님)`);
       return;
     }
 
@@ -139,30 +155,37 @@ async function loginKorail(page: Page, id?: string, pw?: string) {
 
     if (await idInput.isVisible({ timeout: 4000 }) && await pwInput.isVisible({ timeout: 4000 })) {
       console.log('[Login] 회원 로그인 정보 입력 중...');
-      await idInput.focus();
+      await idInput.click();
       await idInput.fill(membershipNo);
-      await pwInput.focus();
+      await page.waitForTimeout(300);
+
+      await pwInput.click();
       await pwInput.fill(password);
       await page.waitForTimeout(300);
 
-      console.log('[Login] 로그인 제출 중...');
-      const submitBtn = page.locator('button.btn_bn-depblue, button:has-text("로그인")').first();
-      if (await submitBtn.isVisible({ timeout: 2000 })) {
+      console.log('[Login] 로그인 폼 제출 중...');
+      const submitBtn = page.locator('button.btn_bn-depblue').first();
+      if (await submitBtn.count() > 0) {
         await submitBtn.click();
       } else {
         await pwInput.press('Enter');
       }
 
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(3500);
+      await dismissPopup(page);
 
-      const afterText = await page.evaluate(() => document.body.innerText);
-      const isLoggedIn = afterText.includes('로그아웃') || afterText.includes('마이페이지') || afterText.includes('님');
-      if (isLoggedIn) {
-        const nameMatch = afterText.match(/([가-힣]{2,4})\s*님/);
-        const userName = nameMatch ? nameMatch[0] : '회원';
-        console.log('[Login OK] 회원 세션 로그인 완료! (' + userName + ')');
+      // Verify authentication session via loginCheck API
+      const checkFinal = await page.evaluate(async () => {
+        try {
+          const res = await fetch('https://www.korail.com/ebizweb/common/loginCheck?Device=BH&Version=999999999');
+          return await res.json();
+        } catch { return null; }
+      });
+
+      if (checkFinal && checkFinal.strResult === 'SUCC' && checkFinal.strCustNm) {
+        console.log(`[Login OK] 회원 세션 로그인 성공! (회원명: ${checkFinal.strCustNm}님, 회원번호: ${checkFinal.strMbCrdNo})`);
       } else {
-        console.warn('[Login Notice] 로그인 완료 여부 재확인 필요');
+        console.warn('[Login Warning] 로그인 검증 실패 - 비회원 상태일 수 있습니다:', checkFinal?.h_msg_txt || '알 수 없는 응답');
       }
     }
   } catch (err: any) {
@@ -231,7 +254,14 @@ async function selectStation(page: Page, type: 'departure' | 'arrival', stationN
 
 async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   const { year, month, day } = formatDate(dateStr);
-  const hour = (timeStr && /^\d{1,2}$/.test(timeStr)) ? timeStr.padStart(2, '0') : '00';
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  
+  let hour = (timeStr && /^\d{1,2}$/.test(timeStr)) ? timeStr.padStart(2, '0') : '00';
+  if ((!dateStr || dateStr === todayStr) && (hour === '00' || parseInt(hour) < now.getHours())) {
+    hour = String(now.getHours()).padStart(2, '0');
+  }
+
   const hourInt = parseInt(hour);
   console.log('[DateTime] ' + year + '-' + month + '-' + day + ' ' + hour + ':00');
 
@@ -244,11 +274,11 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
 
   const targetDayText = String(parseInt(day));
   
-  // Day selection
+  // Day selection (strictly non-disabled td)
   const dayClicked = await page.evaluate((targetDay: string) => {
     const modalEl = document.querySelector('.ReactModal__Content');
     if (!modalEl) return false;
-    const links = Array.from(modalEl.querySelectorAll('td:not(.disabled) a, td button:not([disabled])'));
+    const links = Array.from(modalEl.querySelectorAll('td:not(.disabled) a, td:not(.disabled) span.day, td:not(.disabled) button'));
     const found = links.find(el => (el as HTMLElement).innerText.trim() === targetDay);
     if (found) {
       (found as HTMLElement).click();
@@ -264,15 +294,17 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   }
   await page.waitForTimeout(500);
 
-  // Hour selection (matches both "8시" and "08시" and "08")
+  // Hour selection (strictly inside .timeSelect container)
   const hourClicked = await page.evaluate((targetHInt: number) => {
     const modalEl = document.querySelector('.ReactModal__Content');
     if (!modalEl) return false;
-    const links = Array.from(modalEl.querySelectorAll('li a, .hour_box a, a, button'));
+    const timeSelect = modalEl.querySelector('.timeSelect');
+    if (!timeSelect) return false;
+    const links = Array.from(timeSelect.querySelectorAll('a, button'));
+    const targetLabel = `${targetHInt}시`;
     const found = links.find(el => {
       const txt = (el as HTMLElement).innerText.trim();
-      const val = parseInt(txt);
-      return !isNaN(val) && val === targetHInt;
+      return txt === targetLabel || txt === String(targetHInt);
     });
     if (found) {
       (found as HTMLElement).click();
@@ -290,7 +322,7 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
   const applied = await page.evaluate(() => {
     const modalEl = document.querySelector('.ReactModal__Content');
     if (!modalEl) return false;
-    const btns = Array.from(modalEl.querySelectorAll('button'));
+    const btns = Array.from(modalEl.querySelectorAll('button, a'));
     const applyBtn = btns.find(b => (b as HTMLElement).innerText.includes('적용'));
     if (applyBtn) {
       (applyBtn as HTMLElement).click();
@@ -311,45 +343,35 @@ async function selectDateTime(page: Page, dateStr?: string, timeStr?: string) {
 
 async function parseResults(page: Page, departure: string, arrival: string): Promise<TrainResult[]> {
   await dismissPopup(page);
-  await page.waitForTimeout(2000);
+  await page.waitForSelector('li.tckList, div.tck_inner, .tckList', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1500);
   const results: TrainResult[] = [];
 
   try {
     const rawTexts = await page.evaluate(() => {
-      const container = document.querySelector('#content') || document.body;
-      const nodes = Array.from(container.querySelectorAll('.tckList, li[class*="List"], tr, div[class*="tck_box"], div[class*="ticket_box"], ul.list_ticket > li, .list_train li')).filter(n => {
-        return !n.closest('header, nav, .header, .head, .gnb, .top_menu, .path_wrap, .breadcrumb');
-      });
+      const container = document.body;
+      const nodes = Array.from(container.querySelectorAll('li.tckList, div.tck_inner, ul.list_ticket > li, .list_train > li, tr:has(td)'))
+        .map(n => ((n as HTMLElement).innerText || '').replace(/\s+/g, ' ').trim())
+        .filter(t => t.length >= 20 && (t.includes('KTX') || t.includes('ITX') || t.includes('무궁화') || t.includes('새마을') || t.includes('누리로')));
 
-      if (nodes.length > 0) {
-        return nodes.map(n => ((n as HTMLElement).innerText || '').replace(/\s+/g, ' ').trim()).filter(t => t.length > 10);
-      }
-      
-      const allDivs = Array.from(container.querySelectorAll('div, li')).filter(el => {
-        if (el.closest('header, nav, .header, .head, .gnb, .top_menu, .path_wrap, .breadcrumb')) return false;
-        const txt = (el as HTMLElement).innerText || '';
-        return (txt.includes('→') || txt.includes('->') || txt.includes('소요시간')) && 
-               (txt.includes('KTX') || txt.includes('ITX') || txt.includes('무궁화') || txt.includes('새마을') || txt.includes('누리로'));
-      });
-      return allDivs.map(n => ((n as HTMLElement).innerText || '').replace(/\s+/g, ' ').trim()).filter(t => t.length > 10);
+      return nodes;
     });
 
     console.log('[Parse] 텍스트 블록 발견 수:', rawTexts.length);
 
-    for (const text of rawTexts.slice(0, 30)) {
-      if (!text || text.includes('해당 스케줄에 운행하는 열차가 없습니다')) continue;
+    const seenKeys = new Set<string>();
 
+    for (const text of rawTexts) {
       const trainNameMatch = text.match(/(KTX[^\s]*|ITX[^\s]*|무궁화[^\s]*|새마을[^\s]*|누리로[^\s]*)\s*(\d+)?/i);
       const times = text.match(/\d{2}:\d{2}/g);
 
-      // Must have at least train name OR both departure/arrival times to be a valid row
-      if (!trainNameMatch && (!times || times.length < 2)) {
+      if (!trainNameMatch || !times || times.length < 2) {
         continue;
       }
 
-      const trainNo = trainNameMatch ? trainNameMatch[0].trim() : '코레일 열차';
-      const departTime = times ? times[0] : '';
-      const arrivalTime = (times && times.length > 1) ? times[1] : '';
+      const trainNo = trainNameMatch[0].trim();
+      const departTime = times[0];
+      const arrivalTime = times[1];
 
       const durMatch = text.match(/소요시간:\s*([^\s]+)/);
       const duration = durMatch ? durMatch[1] : '';
@@ -360,19 +382,21 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
         ? (text.includes('매진임박') ? '매진임박' : '예매가능')
         : '매진';
 
-      if (departTime && arrivalTime) {
-        results.push({
-          trainNo,
-          departure,
-          arrival,
-          departTime,
-          arrivalTime,
-          duration,
-          generalSeat: seatLabel,
-          specialSeat: '',
-          available
-        });
-      }
+      const key = `${trainNo}_${departTime}_${arrivalTime}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+
+      results.push({
+        trainNo,
+        departure,
+        arrival,
+        departTime,
+        arrivalTime,
+        duration,
+        generalSeat: seatLabel,
+        specialSeat: '',
+        available
+      });
     }
   } catch (err: any) {
     console.warn('[Parse warning]', err.message);
@@ -429,7 +453,19 @@ export async function searchKorailTickets(options: KorailSearchOptions): Promise
     await selectDateTime(page, dateStr, timeStr);
 
     console.log('[Search] 조회 버튼 클릭...');
-    await page.click('button.btn_lookup');
+    await dismissPopup(page);
+    const lookupClicked = await page.evaluate(() => {
+      const btn = document.querySelector('button.btn_lookup') as HTMLElement;
+      if (btn) {
+        btn.click();
+        return true;
+      }
+      return false;
+    });
+
+    if (!lookupClicked) {
+      await page.click('button.btn_lookup').catch(() => {});
+    }
     await page.waitForTimeout(4000);
 
     const results = await parseResults(page, departure, arrival);
@@ -471,7 +507,19 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
     await selectDateTime(page, dateStr, timeStr);
 
     console.log('[Reserve] 조회 버튼 클릭...');
-    await page.click('button.btn_lookup');
+    await dismissPopup(page);
+    const lookupClicked = await page.evaluate(() => {
+      const btn = document.querySelector('button.btn_lookup') as HTMLElement;
+      if (btn) {
+        btn.click();
+        return true;
+      }
+      return false;
+    });
+
+    if (!lookupClicked) {
+      await page.click('button.btn_lookup').catch(() => {});
+    }
     await page.waitForTimeout(4000);
 
     const results = await parseResults(page, departure, arrival);
@@ -486,11 +534,11 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
     
     // Locate and click the reservation button in the SPECIFIC matching train row (excluding GNB header)
     const clicked = await page.evaluate(({ targetNo, targetDepTime }: { targetNo: string; targetDepTime: string }) => {
-      const container = document.querySelector('#content') || document.body;
+      const container = document.body;
       const cleanTargetNo = (targetNo || '').replace(/\s+/g, '');
 
       // 1. Find matching train row by departure time or train number
-      const rows = Array.from(container.querySelectorAll('tr, li, div[class*="tck"], div[class*="train"], div[class*="item"], div[class*="list"], div[class*="schedule"]')).filter(r => {
+      const rows = Array.from(container.querySelectorAll('li.tckList, div.tck_inner, tr, li, div[class*="tck"]')).filter(r => {
         const isHeader = r.closest('header, nav, .header, .head, .gnb, .top_menu, .path_wrap, .breadcrumb');
         if (isHeader) return false;
         const txt = (r as HTMLElement).innerText || '';
@@ -539,13 +587,10 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
     await page.waitForTimeout(4000);
     await dismissPopup(page);
 
-    // Verify true reservation success:
-    // 1. URL must contain reservation/payment/cart endpoints (/ticket/reservation/, /ticket/payment/, /ticket/cart)
-    // 2. OR main content container (#content) text must explicitly contain reservation confirmation terms: '결제기한', '예약번호', '예약이 완료되었습니다', '승차권 예약 완료'
-    // MUST NOT match GNB menu text ('장바구니', '예약', '결제') on general search pages!
+    // Verify true reservation success
     const currentUrl = page.url();
     const contentText = await page.evaluate(() => {
-      const contentEl = document.querySelector('#content') || document.querySelector('main');
+      const contentEl = document.querySelector('#content') || document.querySelector('main') || document.body;
       return contentEl ? (contentEl as HTMLElement).innerText : '';
     });
 
@@ -588,4 +633,4 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
 with open(output_path, "w", encoding="utf-8") as f:
     f.write(code)
 
-print("Generated robust korail_engine.ts successfully")
+print("Generated final korail_engine.ts with waitForSelector & card parsing")
