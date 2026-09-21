@@ -128,20 +128,41 @@ async function loginKorail(page: Page, id?: string, pw?: string) {
     await page.goto('https://www.korail.com/ticket/login', { waitUntil: 'domcontentloaded', timeout: 15000 });
     await page.waitForTimeout(1500);
 
+    const initialText = await page.evaluate(() => document.body.innerText);
+    if (initialText.includes('로그아웃') || initialText.includes('마이페이지')) {
+      console.log('[Login OK] 이미 로그인된 회원 세션입니다.');
+      return;
+    }
+
     const idInput = page.locator('#id, input[name="id"]').first();
     const pwInput = page.locator('#password, input[name="password"]').first();
 
     if (await idInput.isVisible({ timeout: 4000 }) && await pwInput.isVisible({ timeout: 4000 })) {
       console.log('[Login] 회원 로그인 정보 입력 중...');
+      await idInput.focus();
       await idInput.fill(membershipNo);
+      await pwInput.focus();
       await pwInput.fill(password);
       await page.waitForTimeout(300);
 
-      const loginBtn = page.locator('a.btnGoLogin, button.btn_bn-depblue').first();
-      if (await loginBtn.isVisible({ timeout: 3000 })) {
-        await loginBtn.click();
-        await page.waitForTimeout(3000);
-        console.log('[Login OK] 회원 세션 로그인 완료!');
+      console.log('[Login] 로그인 제출 중...');
+      const submitBtn = page.locator('button.btn_bn-depblue, button:has-text("로그인")').first();
+      if (await submitBtn.isVisible({ timeout: 2000 })) {
+        await submitBtn.click();
+      } else {
+        await pwInput.press('Enter');
+      }
+
+      await page.waitForTimeout(3000);
+
+      const afterText = await page.evaluate(() => document.body.innerText);
+      const isLoggedIn = afterText.includes('로그아웃') || afterText.includes('마이페이지') || afterText.includes('님');
+      if (isLoggedIn) {
+        const nameMatch = afterText.match(/([가-힣]{2,4})\s*님/);
+        const userName = nameMatch ? nameMatch[0] : '회원';
+        console.log('[Login OK] 회원 세션 로그인 완료! (' + userName + ')');
+      } else {
+        console.warn('[Login Notice] 로그인 완료 여부 재확인 필요');
       }
     }
   } catch (err: any) {
@@ -294,20 +315,6 @@ async function parseResults(page: Page, departure: string, arrival: string): Pro
   const results: TrainResult[] = [];
 
   try {
-    // 1. Check if page explicitly indicates no trains available
-    const isNoTrain = await page.evaluate(() => {
-      const container = document.querySelector('#content') || document.body;
-      const text = (container as HTMLElement).innerText || '';
-      return text.includes('해당 스케줄에 운행하는 열차가 없습니다') ||
-             text.includes('조회된 열차가 없습니다') ||
-             text.includes('운행열차가 없습니다');
-    });
-
-    if (isNoTrain) {
-      console.log('[Parse] 운행 열차가 없습니다. (0건)');
-      return [];
-    }
-
     const rawTexts = await page.evaluate(() => {
       const container = document.querySelector('#content') || document.body;
       const nodes = Array.from(container.querySelectorAll('.tckList, li[class*="List"], tr, div[class*="tck_box"], div[class*="ticket_box"], ul.list_ticket > li, .list_train li')).filter(n => {
