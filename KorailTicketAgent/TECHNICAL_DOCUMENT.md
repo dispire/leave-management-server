@@ -50,3 +50,8 @@
 - [x] 열차 카드 렌더링 파싱 및 `waitForSelector` 로직 개선 (2026-09-21):
   - 코레일 승차권 조회 결과 페이지(`https://www.korail.com/ticket/search/list`) 렌더링 완료 시점 탐지를 위해 `waitForSelector('li.tckList, div.tck_inner')` 추가.
   - `li.tckList`, `div.tck_inner` 단위 카드 노드에서만 열차명, 출발시간, 도착시간, 소요시간, 좌석 상태(예매가능/매진임박/매진)를 파싱하여 0건 오탐지 방지 및 실시간 열차 일정 수집 검증 완료 (총 10건 수집 성공).
+- [x] 코레일 보안 서버(WAF/nFilter) 자동화 탐지 대응 및 지능형 백오프(Smart Backoff) 구현 (2026-09-21):
+  - **CDP level Stealth 강화**: `delete Object.getPrototypeOf(navigator).webdriver`, `permissions.query` 오버라이드 및 `chrome` 런타임 지문 완전 은폐.
+  - **Human-like Simulation**: 로그인 ID/비밀번호 입력 시 마우스 포인터 이동 에뮬레이션(`page.mouse.move`) 및 무작위 지터 타이핑 지연(60ms ~ 150ms) 적용.
+  - **UI 스나이퍼 매크로 재조회 주기 조절**: UI 옵션 카드에 스나이퍼 매크로 재조회 주기 선택 드롭다운(8초, 10초, 15초) 추가 및 정적 주기 대신 `설정값 + 무작위 1.0~3.5초` 지터 조율로 패턴 차단 방지.
+  - **WAF 감지 30초 백오프(Cool-down)**: 코레일 서버 500 에러 발생 시 자동으로 30초 대기 쿨다운 적용 후 안전 재시도 조치.

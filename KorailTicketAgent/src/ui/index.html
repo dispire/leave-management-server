@@ -134,9 +134,9 @@
             </div>
           </div>
 
-          <!-- 옵션 (인접역 / 서울·용산·수서) -->
+          <!-- 옵션 (인접역 / 서울·용산·수서 & 재조회 주기) -->
           <div class="options-section">
-            <div class="options-title">⚙️ 옵션</div>
+            <div class="options-title">⚙️ 옵션 및 보안 주기</div>
             <div class="options-grid">
               <label class="toggle-label">
                 <input type="checkbox" id="includeAdjacent" />
@@ -148,6 +148,14 @@
                 <span class="toggle-track"></span>
                 <span class="toggle-text">서울·용산·수서 함께 보기 <small>(포함)</small></span>
               </label>
+            </div>
+            <div class="input-group" style="margin-top: 10px;">
+              <label for="pollInterval">⏱️ 스나이퍼 매크로 재조회 주기 (WAF 방지)</label>
+              <select id="pollInterval" style="background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 8px; width: 100%;">
+                <option value="8000" selected>8초 간격 + 무작위 1~3초 (권장 - WAF 차단 예방)</option>
+                <option value="10000">10초 간격 + 무작위 1~3초 (안전)</option>
+                <option value="15000">15초 간격 + 무작위 1~3초 (여유)</option>
+              </select>
             </div>
           </div>
 

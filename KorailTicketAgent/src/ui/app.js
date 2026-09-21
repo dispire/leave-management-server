@@ -208,7 +208,8 @@ function startSniperMode() {
 
   log('──────────────────────────────────────────', 'accent');
   log(`🎯 [취소표/자동 예매 매복 모드 시작] ${departure} ➔ ${arrival}`, 'accent');
-  log('ℹ️ 잔여 좌석 발생 시 즉시 자동 예약하며, 5초 간격으로 연속 재시도합니다.', 'info');
+  const baseMs = parseInt(document.getElementById('pollInterval')?.value || '8000', 10);
+  log(`ℹ️ 잔여 좌석 발생 시 즉시 자동 예약하며, 약 ${(baseMs / 1000).toFixed(0)}초(+무작위 지터) 간격으로 연속 재시도합니다.`, 'info');
 
   runSniperLoop();
 }
@@ -232,6 +233,7 @@ async function runSniperLoop() {
   log(`[매복 ${sniperCount}회차 시도] 실시간 좌석 확보 재시도 중...`, 'info');
   setStatus(`매복 ${sniperCount}회차 시도`, 'running');
 
+  let isWafError = false;
   try {
     const isReserved = await doSearch(true, true);
     if (isReserved) {
@@ -240,12 +242,23 @@ async function runSniperLoop() {
       return;
     }
   } catch (err) {
-    log(`⚠️ 매복 시도 중 예외 안내: ${err.message}`, 'warn');
+    const errMsg = err.message || '';
+    if (errMsg.includes('WAF') || errMsg.includes('500') || errMsg.includes('보안')) {
+      isWafError = true;
+      log(`🚨 [WAF 보안 탐지 감지] 코레일 차단 방지를 위해 30초 간 쿨다운(Cool-down) 후 자동 재시도합니다.`, 'error');
+    } else {
+      log(`⚠️ 매복 시도 중 예외 안내: ${errMsg}`, 'warn');
+    }
   }
 
   if (sniperActive) {
-    log(`⏳ [매복 ${sniperCount}회차 완료] 잔여 좌석 없음 - 5초 후 자동 재시도합니다...`, 'info');
-    sniperTimer = setTimeout(runSniperLoop, 5000);
+    const baseInterval = parseInt(document.getElementById('pollInterval')?.value || '8000', 10);
+    const jitter = Math.floor(Math.random() * 2500) + 1000; // 1.0s ~ 3.5s jitter
+    const nextWaitMs = isWafError ? 30000 : (baseInterval + jitter);
+    const sec = (nextWaitMs / 1000).toFixed(1);
+
+    log(`⏳ [매복 ${sniperCount}회차 완료] ${sec}초 후 다음 자동 재시도를 진행합니다...`, 'info');
+    sniperTimer = setTimeout(runSniperLoop, nextWaitMs);
   }
 }
 

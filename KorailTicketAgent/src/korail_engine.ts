@@ -46,20 +46,49 @@ async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
   try {
     const browser = await chromium.launch({
       headless: false,
-      args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+      args: [
+        '--no-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+        '--no-first-run',
+        '--disable-dev-shm-usage',
+        '--disable-browser-side-navigation',
+        '--disable-gpu',
+      ],
     });
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0',
       viewport: { width: 1280, height: 900 },
       locale: 'ko-KR',
       timezoneId: 'Asia/Seoul',
+      permissions: ['geolocation'],
     });
 
     await context.addInitScript(() => {
+      // 1. Delete navigator.webdriver
+      delete Object.getPrototypeOf(navigator).webdriver;
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      (window as any).chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} };
+
+      // 2. Mock chrome runtime & csi
+      (window as any).chrome = {
+        runtime: {},
+        loadTimes: () => {},
+        csi: () => {},
+        app: {},
+      };
+
+      // 3. Mock plugins & languages
       Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
       Object.defineProperty(navigator, 'languages', { get: () => ['ko-KR', 'ko', 'en-US', 'en'] });
+
+      // 4. Mock permissions query
+      const originalQuery = window.navigator.permissions ? window.navigator.permissions.query : null;
+      if (originalQuery) {
+        (window.navigator.permissions as any).query = (parameters: any) =>
+          parameters.name === 'notifications'
+            ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+            : originalQuery(parameters);
+      }
     });
 
     const page = await context.newPage();
@@ -72,6 +101,7 @@ async function connectBrowser(): Promise<{ browser: Browser; page: Page }> {
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(() => {
+      delete Object.getPrototypeOf(navigator).webdriver;
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       (window as any).chrome = { runtime: {}, loadTimes: () => {}, csi: () => {}, app: {} };
     });
@@ -151,18 +181,37 @@ async function loginKorail(page: Page, id?: string, pw?: string) {
     const pwInput = page.locator('#password, input[name="password"]').first();
 
     if (await idInput.isVisible({ timeout: 4000 }) && await pwInput.isVisible({ timeout: 4000 })) {
-      console.log('[Login] 회원 로그인 정보 입력 중...');
+      console.log('[Login] 회원 로그인 정보 입력 중 (Human-like Simulation)...');
+      
+      const idBox = await idInput.boundingBox();
+      if (idBox) {
+        await page.mouse.move(idBox.x + idBox.width / 2, idBox.y + idBox.height / 2, { steps: 5 });
+      }
       await idInput.click();
-      await idInput.fill(membershipNo);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150 + Math.random() * 200);
+      await idInput.fill('');
+      for (const char of membershipNo) {
+        await page.keyboard.type(char, { delay: 60 + Math.random() * 60 });
+      }
+      await page.waitForTimeout(300 + Math.random() * 200);
 
+      const pwBox = await pwInput.boundingBox();
+      if (pwBox) {
+        await page.mouse.move(pwBox.x + pwBox.width / 2, pwBox.y + pwBox.height / 2, { steps: 5 });
+      }
       await pwInput.click();
-      await pwInput.fill(password);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150 + Math.random() * 200);
+      await pwInput.fill('');
+      for (const char of password) {
+        await page.keyboard.type(char, { delay: 70 + Math.random() * 70 });
+      }
+      await page.waitForTimeout(400 + Math.random() * 300);
 
       console.log('[Login] 로그인 폼 제출 중...');
       const submitBtn = page.locator('button.btn_bn-depblue').first();
-      if (await submitBtn.count() > 0) {
+      const submitBox = await submitBtn.boundingBox().catch(() => null);
+      if (submitBox) {
+        await page.mouse.move(submitBox.x + submitBox.width / 2, submitBox.y + submitBox.height / 2, { steps: 5 });
         await submitBtn.click();
       } else {
         await pwInput.press('Enter');
@@ -436,6 +485,13 @@ export async function searchKorailTickets(options: KorailSearchOptions): Promise
   console.log('=================================================\n');
 
   const { browser, page } = await connectBrowser();
+  let isWafBlocked = false;
+  page.on('response', (res) => {
+    if (res.url().includes('/web_s/') && res.status() === 500) {
+      isWafBlocked = true;
+    }
+  });
+
   try {
     // 회원 로그인 시도
     await loginKorail(page, korailId, korailPw);
@@ -465,6 +521,10 @@ export async function searchKorailTickets(options: KorailSearchOptions): Promise
     }
     await page.waitForTimeout(4000);
 
+    if (isWafBlocked) {
+      throw new Error('코레일 방화벽(WAF)에 의해 API 조회가 차단되었습니다 (IP 일시 차단 의심). 너무 잦은 조회로 인해 일시적으로 차단되었을 수 있습니다. 잠시 후 다시 시도하시거나 VPN/핫스팟을 이용해 IP를 변경해주세요.');
+    }
+
     const results = await parseResults(page, departure, arrival);
     console.log('[Search OK] 총 ' + results.length + '건의 열차 발견');
     return results;
@@ -490,6 +550,13 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
   console.log('=================================================\n');
 
   const { browser, page } = await connectBrowser();
+  let isWafBlocked = false;
+  page.on('response', (res) => {
+    if (res.url().includes('/web_s/') && res.status() === 500) {
+      isWafBlocked = true;
+    }
+  });
+
   try {
     // 회원 로그인 시도
     await loginKorail(page, korailId, korailPw);
@@ -518,6 +585,10 @@ export async function reserveKorailTickets(options: KorailSearchOptions): Promis
       await page.click('button.btn_lookup').catch(() => {});
     }
     await page.waitForTimeout(4000);
+
+    if (isWafBlocked) {
+      throw new Error('코레일 방화벽(WAF)에 의해 API 조회가 차단되었습니다 (IP 일시 차단 의심). 너무 잦은 조회로 인해 일시적으로 차단되었을 수 있습니다. 잠시 후 다시 시도하시거나 VPN/핫스팟을 이용해 IP를 변경해주세요.');
+    }
 
     const results = await parseResults(page, departure, arrival);
     const availableTrain = results.find(t => t.available && (!targetTrainNo || t.trainNo.includes(targetTrainNo)));
