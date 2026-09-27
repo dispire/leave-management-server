@@ -1,0 +1,58 @@
+# Root .gitignore for Leave Management Workspace Protection
+# Protects https://github.com/dispire/leave-management-server repository from accidental pollution
+
+# Node & Python dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env.local
+.env.*.local
+*.log
+
+# Build outputs
+dist/
+build/
+release/
+
+# Temporary data & caches
+scratch/
+*.tmp
+temp_*/
+
+# Independent Subprojects (To be hosted on their own separate GitHub repositories)
+AuthorDuplicateFinder/
+BrowserUseAgent/
+DaumMailDownloader/
+EdgeCookieExporter/
+HomeShoppingCrawler/
+HospitalInventorySystem/
+ImageDownloader/
+MedicalNewsClipper/
+NaverRealEstate/
+PageCollector/
+PCOptimizer/
+PromoScreensaver/
+TelegramMCP-Agent/
+insta_downloader/
+hitomi_downloaded_insta/
+
+# Backup folders inside LeaveManagementSystem (keep repo lean)
+LeaveManagementSystem/backups/
+LeaveManagementSystem/server_backup/
+
+# Standalone scratch & data scripts
+analyze_files.py
+check_details.py
+inspect_dir.py
+naver_blog_crawler.py
+organize_photos.py
+results.csv
+results.json
+verify_completion.py
+verify_offset.py
+youtube_crawler.py
+youtube_results.csv
+youtube_results.json
